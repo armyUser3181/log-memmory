@@ -17,8 +17,6 @@ FLOW FLOW_FALSE = "FLOW_FALSE";
 struct AS {
     uint64_t* ptr;
     uint64_t ptr_size;
-    uint64_t level;
-    FLOW message;
 };
 
 typedef FLOW FN;
@@ -82,7 +80,6 @@ typedef struct AS * const ARAS;
 struct AS * createAS() {
     ARAS AS = malloc( sizeof(struct AS) );
     if(!AS) return NULL;
-    AS->level = 1;
     AS->ptr_size = 1 << 6;
     AS->ptr = malloc( sizeof( uint64_t ) * AS->ptr_size << 3 );
     if(!AS->ptr) {
@@ -99,40 +96,42 @@ struct AS * destroyAS(ARAS AS) {
     return NULL;
 }
 
+inline static INT ASofLevel(INT size) {
+    return (63 - ofRightBit(size)) / 6;
+}
+
 FN ASExtendSpace(ARAS AS) {
     uint64_t size = AS->ptr_size;
     AS->ptr_size <<= 2;
     uint64_t * ptr = realloc(AS->ptr, AS->ptr_size * sizeof( uint64_t ) << 3 );
     if(!ptr) return FLOW_ERROR;
     AS->ptr = ptr;
-    INT low = ofStartMaskPoint8(size, AS->level), high = ofStartMaskPoint8(AS->ptr_size, AS->level);
+    INT level = ASofLevel(AS->ptr_size);
+    INT low = ofStartMaskPoint8(size, level), high = ofStartMaskPoint8(AS->ptr_size, level);
     for(int i = low + 1; i <= high; i++) {
-        INT point = ofMaskPoint8(i, AS->level);
+        INT point = ofMaskPoint8(i, level);
         AS->ptr[point] = 0;
         AS->ptr[point + 1] = 0;
     }
     return FLOW_NONE;
 }
 
-FN ASExtendLevel(ARAS AS) {
-    AS->level += 1;
-    INT low = ofStartMaskPoint8(0, AS->level), high = ofStartMaskPoint8(AS->ptr_size, AS->level);
-    for(int i = low + 1; i <= high; i++) {
-        INT point = ofMaskPoint8(i, AS->level);
-        AS->ptr[point] = 0;
-        AS->ptr[point + 1] = 0;
-    }
-    return FLOW_NONE;
-}
-
-FN ASofMemoryPoint(ARAS AS, INT size) {
+FN ASofMemoryPoint(ARAS AS, INT arg_size) {
     INT point = 0;
-    INT sizeToLevel = ofRightBit(size);
-    int i = AS->level - 1;
-    for(i; sizeToLevel <= i; i--) {
+    INT sizeToLevel = ASofLevel(arg_size);
+    INT level = ASofLevel(AS->ptr_size);
+    int i = level;
+    
+    INT space_size = 1 << 6 * level + 3;
+    INT size = (arg_size - 1 >> 6 * sizeToLevel) + 1;
+    for(i; sizeToLevel < i - 1; i--) {
         point = ofLeftBit( ~AS->ptr[ofMaskPoint8(point, i)] );
     }
-    point = ofLeftBit( ~AS->ptr[ofMaskPoint8(point, i)] ); // 중단점
+    INT index = ofLeftBit( toContiBit(~AS->ptr[ofMaskPoint8(point, i)], size) );
+    //printf("<%lb>", toContiBit(~AS->ptr[ofMaskPoint8(point, i)], size));
+    printf("<%ld>", index);
+    printf("<%ld>", point); return FLOW_FALSE;
+    //point = ofLeftBit( ~AS->ptr[ofMaskPoint8(point, i)] ); // 중단점
 }
 
 int main(int argc, char *argv[]) {
@@ -145,8 +144,12 @@ int main(int argc, char *argv[]) {
         printf("%ld", i);
     }
     printf(">\n");
+    // 0b000000000000000000000000000000000000000000000000000000000010001ULL
+    printf("<TOCON: %lb>", toContiBit(~0b000000000000000000000000000000000000000000000000000000000010001, 63));
+    printf("<RSCON: %ld>", ofLeftBit( toContiBit(~0b000000000000000000000000000000000000000000000000000000011110001ULL, 63) ));
     struct AS * AS = createAS();
-    
+    AS->ptr[ofMaskPoint8(0, 1)] = 0b000000000000000000000000000000000000000000000000000000000010001;
+    ASofMemoryPoint(AS, 32);
     AS = destroyAS(AS);
     return 0;
 }
