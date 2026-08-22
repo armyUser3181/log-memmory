@@ -52,12 +52,57 @@ INT ofRightBit(INT value) {
 
 INT toContiBit(INT value, INT size) {
     for(int i = 0; i < 7; i++) {
+        //printf("<%lb>\n", value);
         INT play = (64 >> i);
         INT bcmp = play < size;
         INT RV = play * bcmp;
+        //printf("%ld %ld\t%lb\n", play, bcmp, value);
         value = (value >> RV) & value;
         size -= RV;
     }
+    return value;
+}
+
+INT toContiBitLows(INT value, INT size) {
+    for(int i = 1; i < size; i ++) {
+        value = (value >> 1) & value;
+    }
+    return value;
+}
+
+INT toContiBitEx(INT value, INT size) {
+
+    for(int i = 0; i < 5; i++) {
+        INT play = (1 << i);
+        INT bcmp = play < size;
+        INT RV = play * bcmp;
+        value = ((value >> RV) & value);
+        size -= RV;
+        //printf("%ld %ld %ld\t%lb\n", size, play, bcmp, value);
+    }
+
+    for(int i = 4; i < 6; i++) {
+        INT play = (64 >> i);
+        INT bcmp = play < size;
+        INT RV = play * bcmp;
+        value = ((value >> RV) & value);
+        size -= RV;
+        //printf("%ld %ld %ld\t%lb\n", size, play, bcmp, value);
+    }
+
+    for(int i = 0; i < 1; i++) {
+        INT play = (1);
+        INT bcmp = play < size;
+        INT RV = play * bcmp;
+        value = ((value >> RV) & value);
+        size -= RV;
+        //printf("%ld %ld %ld\t%lb\n", size, play, bcmp, value);
+    }
+
+    /* for(int i = 1; i < size; i++) {
+        value = ((value >> 1) & value);
+    } */
+    
     return value;
 }
 
@@ -134,10 +179,24 @@ FN ASofMemoryPoint(ARAS AS, INT arg_size) {
     //point = ofLeftBit( ~AS->ptr[ofMaskPoint8(point, i)] ); // 중단점
 }
 
+FN tast() {
+    INT value = 0;
+    FN flow = FLOW_NONE;
+    for(value = 1; value != 1212112ULL; value++) for(INT size = 2; size < 64; size++) {
+        if( toContiBitEx(value, size) != toContiBitLows(value, size) ) {
+            printf("<error: <%ld><%ld>>", value, size);
+            flow = FLOW_ERROR;
+        }
+    }
+    return flow;
+}
+
 int main(int argc, char *argv[]) {
     INT NULLINT = 0b0000000000000000000000000000000000000000000000000000000000000000;
     INT FULLINT = 0b1111111111111111111111111111111111111111111111111111111111111111;
     INT TASTINT = 0b0000000000000000000000000000000011111111111111111111111111111111;
+    puts(tast());
+    return 0;
     printf("<%ld %ld>", ofMaskPoint8(0, 1), ofStartMaskPoint8(510, 1) );
     printf("<");
     for(INT i = ofStartMaskPoint8(ofMaskPoint8(0, 1) + 300, 1); i <= ofStartMaskPoint8(ofMaskPoint8(1, 1), 1); i++ ) {
@@ -145,8 +204,16 @@ int main(int argc, char *argv[]) {
     }
     printf(">\n");
     // 0b000000000000000000000000000000000000000000000000000000000010001ULL
-    printf("<TOCON: %lb>", toContiBit(~0b000000000000000000000000000000000000000000000000000000000010001, 63));
-    printf("<RSCON: %ld>", ofLeftBit( toContiBit(~0b000000000000000000000000000000000000000000000000000000011110001ULL, 63) ));
+    INT size = 61; 
+    INT value = ~0b000000000000000000000000000000000000000000000000000000000010001ULL;
+    printf("<1TOCONEX: %lb>\n", toContiBitLows(value, size));
+    printf("<2TOCONEX: %lb>\n", toContiBitEx(value, size));
+    printf("<3TOCONEX: %lb>\n", toContiBit(value, size));
+    printf("<4TOCONEX: %lb>\n", toContiBitLows(0b000000000000000000000000000000000000011000000000000000001001001ULL, 2));
+    //printf("<TOCONAX: %lb>", toContiBit(~0b0000000000000000000000000000000011111111111111111111111111111111ULL, 32));
+    printf("<len: %ld>", strlen("100000000000000000000000000000000"));
+    return 0;
+    printf("<RSCONEX: %ld>", ofLeftBit( toContiBitEx(~0b000000000000000000000000000000000000000000000000000000011110001ULL, 63) ));
     struct AS * AS = createAS();
     AS->ptr[ofMaskPoint8(0, 1)] = 0b000000000000000000000000000000000000000000000000000000000010001;
     ASofMemoryPoint(AS, 32);
