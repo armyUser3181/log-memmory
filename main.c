@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <time.h>
 
 #define bugp printf("<bug: FILE: %s LINE: %d NAME: %s>", __FILE__, __LINE__, __func__)
 
@@ -142,28 +143,32 @@ FN ASExtendSpace(ARAS AS) {
     return FLOW_NONE;
 }
 
-FN ASofMemoryPoint(ARAS AS, INT arg_size) {
+int ASofMemoryPoint(ARAS AS, INT arg_size) {
     INT point = 0;
     INT sizeToLevel = ASofLevel(arg_size);
     INT level = ASofLevel(AS->ptr_size);
     int i = level;
-    
     INT space_size = 1 << 6 * level + 3;
     INT size = (arg_size - 1 >> 6 * sizeToLevel) + 1;
     for(i; sizeToLevel < i - 1; i--) {
-        //printf("<llld<%ld><%d>>\n", point, i);
         INT thisMaskAll = AS->ptr[ ofMaskPoint8(point, i) ];
         INT thisMaskAny = AS->ptr[ ofMaskPoint8(point, i) + 1 ];
-        point = ofLeftBit( ~thisMaskAll ) + (point << 6);
-
+        point = ofLeftBit( ~thisMaskAll ) + (point << 6); // 중단점
     }
     INT index = ofLeftBit( toContiBit(~AS->ptr[ofMaskPoint8(point, i)], size) );
-    printf("<llld<%ld><%d>>\n", point, i);
-    //printf("<%lb>", toContiBit(~AS->ptr[ofMaskPoint8(point, i)], size));
-    /* printf("<%ld>", index);
-    printf("<%ld>", point);  */
-    return FLOW_FALSE;
+    
+    return index;
     //point = ofLeftBit( ~AS->ptr[ofMaskPoint8(point, i)] ); // 중단점
+}
+
+clock_t ofTimeTast(ARAS AS) {
+    volatile const char* rs = FLOW_NONE;
+    //volatile void* code[1<<10] = {0};
+    srand(time(NULL)); volatile int rands[1<<10] = {0}; for(int i = 0; i < 1 << 10; i++) rands[i] = rand(); clock_t t = clock();
+    for(int i = 0; i < 1 << 10; i++) {
+        rands[i] = ASofMemoryPoint(AS, 32);
+    }
+    return clock() - t;
 }
 
 int main(int argc, char *argv[]) {
@@ -190,7 +195,8 @@ int main(int argc, char *argv[]) {
     AS->ptr[ofMaskPoint8(2, 3)] = 0b111;
     AS->ptr[ofMaskPoint8(131, 2)] = 0b01;
     AS->ptr[ofMaskPoint8(131*64+1, 1)] = 0b000000000000000000000000000000000000000000000000100001000010001;
-    ASofMemoryPoint(AS, 32);
+    //ASofMemoryPoint(AS, 32);
+    printf("<time: %lf>\n", (double)ofTimeTast(AS) / (1<<10) );
     AS = destroyAS(AS);
     return 0;
 }
