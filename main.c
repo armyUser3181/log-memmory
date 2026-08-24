@@ -143,22 +143,27 @@ FN ASExtendSpace(ARAS AS) {
     return FLOW_NONE;
 }
 
-int ASofMemoryPoint(ARAS AS, INT arg_size) {
-    INT point = 0;
+INT ASofMemoryPoint(ARAS AS, INT arg_size) {
+    INT point_any = 0, point_all;
     INT sizeToLevel = ASofLevel(arg_size);
     INT level = ASofLevel(AS->ptr_size);
     int i = level;
     INT space_size = 1 << 6 * level + 3;
     INT size = (arg_size - 1 >> 6 * sizeToLevel) + 1;
     for(i; sizeToLevel < i - 1; i--) {
-        INT thisMaskAll = AS->ptr[ ofMaskPoint8(point, i) ];
-        INT thisMaskAny = AS->ptr[ ofMaskPoint8(point, i) + 1 ];
-        point = ofLeftBit( ~thisMaskAll ) + (point << 6); // 중단점
+        INT all = AS->ptr[ ofMaskPoint8(point_any, i) ];
+        /* INT any = AS->ptr[ ofMaskPoint8(point_any, i) + 1 ];
+        printf("<%ld>", any); */
+        //point_any = ( point_any == -1 ? point_any : ofLeftBit( ~all & any ) + (point_any << 6) );
+        point_any = ( point_any == -1 ? point_any : ofLeftBit( ~all ) + (point_any << 6) );
     }
-    INT index = ofLeftBit( toContiBit(~AS->ptr[ofMaskPoint8(point, i)], size) );
-    
-    return index;
-    //point = ofLeftBit( ~AS->ptr[ofMaskPoint8(point, i)] ); // 중단점
+    /* for(i = level; sizeToLevel < i - 1; i--) {
+        INT all = AS->ptr[ ofMaskPoint8(point_all, i) ];
+        INT any = AS->ptr[ ofMaskPoint8(point_all, i) + 1 ];
+        point_all = ( point_all == -1 ? point_all : ofLeftBit( ~all & ~any ) + (point_all << 6) );
+    } */
+    INT index_any = ofLeftBit( toContiBit(~AS->ptr[ofMaskPoint8(point_any, i)], size) );
+    return index_any == -1 ? index_any + (point_any << 6) : point_all << 6;
 }
 
 clock_t ofTimeTast(ARAS AS) {
@@ -196,7 +201,8 @@ int main(int argc, char *argv[]) {
     AS->ptr[ofMaskPoint8(131, 2)] = 0b01;
     AS->ptr[ofMaskPoint8(131*64+1, 1)] = 0b000000000000000000000000000000000000000000000000100001000010001;
     //ASofMemoryPoint(AS, 32);
-    printf("<time: %lf>\n", (double)ofTimeTast(AS) / (1<<10) );
+    printf("<point: %ld>", ASofMemoryPoint(AS, 32));
+    //printf("<time: %lf>\n", (double)ofTimeTast(AS) / (1<<10) );
     AS = destroyAS(AS);
     return 0;
 }
