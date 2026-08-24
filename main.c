@@ -163,7 +163,7 @@ INT ASofMemoryPoint(ARAS AS, INT arg_size) {
         point_all = ( point_all == -1 ? point_all : ofLeftBit( ~all & ~any ) + (point_all << 6) );
     } */
     INT index_any = ofLeftBit( toContiBit(~AS->ptr[ofMaskPoint8(point_any, i)], size) );
-    return index_any == -1 ? index_any + (point_any << 6) : point_all << 6;
+    return index_any == -1 ? point_all << 6 : index_any + (point_any << 6);
 }
 
 clock_t ofTimeTast(ARAS AS) {
