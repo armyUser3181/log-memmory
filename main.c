@@ -53,7 +53,7 @@ INT ofRightBit(INT value) {
 
 INT toContiBit(INT value, INT size) {
 
-    for(int i = 0; i < 5; i++) {
+    for(int i = 0; i < 4; i++) {
         INT play = (1 << i);
         INT bcmp = play < size;
         INT RV = play * bcmp;
@@ -62,7 +62,7 @@ INT toContiBit(INT value, INT size) {
         //printf("%ld %ld %ld\t%lb\n", size, play, bcmp, value);
     }
 
-    for(int i = 4; i < 6; i++) {
+    for(int i = 2; i < 6; i++) {
         INT play = (64 >> i);
         INT bcmp = play < size;
         INT RV = play * bcmp;
@@ -84,6 +84,13 @@ INT toContiBit(INT value, INT size) {
         value = ((value >> 1) & value);
     } */
     
+    return value;
+}
+
+INT toContiBitLow(INT value, INT size) {
+    for(int i = 1; i < size; i++) {
+        value = ((value >> 1) & value);
+    }
     return value;
 }
 
@@ -165,7 +172,7 @@ inline static INT CallFindMaskPoint0X(ARAS AS, INT level, INT point) {
 }
 
 INT ASofMemoryPoint(ARAS AS, INT arg_size) {
-    INT point_any = 0, point_all;
+    INT point_any = 0, point_all = 0;
     int sizeToLevel = ASofLevel(arg_size);
     INT level = ASofLevel(AS->ptr_size);
     int i = level;
@@ -189,16 +196,30 @@ INT ASofMemoryPoint(ARAS AS, INT arg_size) {
     for(int i = level; sizeToLevel < i - 1; i--) {
         point_all = ( point_all == -1 ? point_all : CallFindMaskPoint00(AS, i, point_all) );
     }
+    //printf("<t: %ld %ld %ld>", index_any, point_all, index_any_64);
     return index_any == -1 ? point_all << 6 : index_any + (point_any << 6);
+}
+
+INT tastCase(INT value, INT size, INT R) {
+    return toContiBit(value, size) + R;
 }
 
 clock_t ofTimeTast(ARAS AS) {
     volatile const char* rs = FLOW_NONE;
-    //volatile void* code[1<<10] = {0};
-    srand(time(NULL)); volatile int rands[1<<10] = {0}; for(int i = 0; i < 1 << 10; i++) rands[i] = rand(); clock_t t = clock();
+    volatile INT code[1<<10] = {0};
+    int top = 0;
+    srand(time(NULL)); volatile INT rands[1<<10] = {0}; for(int i = 0; i < 1 << 10; i++) rands[i] = ((uint64_t)rand() << 32) | rand(); clock_t t = clock();
     for(int i = 0; i < 1 << 10; i++) {
-        rands[i] = ASofMemoryPoint(AS, 32);
+        /* code[i] = (tastCase(rands[i], rands[i] % 64, rands[i] + i ) == (toContiBitLow(rands[i], rands[i] % 64) + rands[i] + i));
+        printf(code[i] ? "" : "error"); */
+        /* code[i] = tastCase(rands[i], rands[i] % 64, rands[i] + i); */
     }
+    /* for(INT value = 0; ~value != 0ULL; value++ ) for(INT size = 0; size != 65; size++) {
+        //printf("<value: %ld, size: %ld>\n<%lb>\n<%lb>\n", ~value, size, ~value, toContiBit(~value, size));
+        code[top] = ( tastCase(~value, size, rands[top]) == (toContiBitLow(~value, size) + rands[top]));
+        //if( value == (1ULL << 32) ) printf("f");
+        top = top % (1<<10) + 1;
+    } */
     return clock() - t;
 }
 
@@ -218,7 +239,8 @@ int main(int argc, char *argv[]) {
     for(int i = 0; i < 12; i++) {
         printf("<%ld>", ofMaskPoint8(i, 1));
     } */
-    struct AS * AS = createAS(); 
+    struct AS * AS = createAS();
+    printf("<count: %d>\n", printf("<%lb>\n<%lb>\n-----\n", TASTINT, toContiBitLow(TASTINT, 31)) - ( 5 + 4 + 3 ) );
     /* for(int i = 0; i < 10; i++) {
         ASExtendSpace(AS);
     } */
@@ -227,12 +249,14 @@ int main(int argc, char *argv[]) {
     AS->ptr[ofMaskPoint8(131, 2)] = 0b01;
     AS->ptr[ofMaskPoint8(131*64+1, 1)] = 0b0000000000000000000000000000000000000000000000000100001000010001; */
     //ASofMemoryPoint(AS, 32);
-    AS->ptr[ofMaskPoint8(0, 1)] = 0b101001;
+    AS->ptr[ofMaskPoint8(0, 1)] = 0b1111111111111111111111111111111111111111111111111111111111111111;
+    AS->ptr[ofMaskPoint8(1, 1)] = 0b1111111111111111111111111111111111111111111111111111111111111111;
     //printf("<level: %ld>", ASofLevel(64) );
     printf("<AS|size: %ld>", AS->ptr_size);
     printf("<point: %ld>", ASofMemoryPoint(AS, 32));
     puts("");
-    //printf("<time: %lf>\n", (double)ofTimeTast(AS) / (1<<10) );
+    printf("<rpo: %ld>", ofMaskPoint8(0, 2));
+    printf("<time: %lf>\n", (double)ofTimeTast(AS) / (1<<10) );
     AS = destroyAS(AS);
     return 0;
 }
