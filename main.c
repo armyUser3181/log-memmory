@@ -187,10 +187,11 @@ INT ASofMemoryPoint(ARAS AS, INT arg_size) {
         INT mask = 0;
         INT low = i - 1;
         for(int i = 0; i < 64; i++) {
-            mask |= (toContiBit((~AS->ptr[ofMaskPoint8( (point_any << 6) + i, low)]), size) != 0) << i;
+            mask |= ((INT)(toContiBit((~AS->ptr[ofMaskPoint8( (point_any << 6) + i, low)]), size) != 0) << i);
+            //printf("<mask: %lu><i: %d>\n", mask, i);
         }
-        index_any_64 = ofLeftBit( mask ) + (point_any << 6); // 중단점
-        printf("<code: %lb>", index_any_64);
+        index_any_64 = ofLeftBit( mask ) + (point_any << 6);
+        //printf("<code: %lb>", mask);
     }
     INT index_any = (1<i) ? index_any_64 : index_any_0;
     INT point_all = ofLeftBit( ~AS->ptr[ofMaskPoint8(0, level)] );
@@ -199,6 +200,7 @@ INT ASofMemoryPoint(ARAS AS, INT arg_size) {
     }
     if(1 << 24 < AS->ptr_size) {
         printf("<s: %ld %d %ld>", level, sizeToLevel, index_any_64);
+        //printf("<0: %ld, 1: %ld>", AS->ptr[ofMaskPoint8(0, 1)], AS->ptr[ofMaskPoint8(1, 1)]);
         return AS->ptr_size;
     }
     //printf("<t: %ld %ld %ld>", index_any, point_all, point_any);
@@ -259,7 +261,6 @@ int main(int argc, char *argv[]) {
     AS->ptr[ofMaskPoint8(131*64+1, 1)] = 0b0000000000000000000000000000000000000000000000000100001000010001; */
     //ASofMemoryPoint(AS, 32);
     AS->ptr[ofMaskPoint8(0, 1)] = 0b1111111111111111111111111111111111111111111111111111111111111111;
-    AS->ptr[ofMaskPoint8(1, 1)] = 0b1111111111111111111111111111111111111111111111111111111111111111;
     //printf("<level: %ld>", ASofLevel(64) );
     printf("<AS|size: %ld>", AS->ptr_size << 6);
     printf("<point: %ld>", ASofMemoryPoint(AS, 32));
