@@ -174,10 +174,10 @@ inline static INT CallFindMaskPoint0X(ARAS AS, INT level, INT point) {
 INT ASofMemoryPoint(ARAS AS, INT arg_size) {
     int sizeToLevel = ASofLevel(arg_size);
     INT level = ASofLevel(AS->ptr_size);
-    int i = level - 1;
+    int i = level;
     INT space_size = 1 << 6 * level + 3;
     INT size = (arg_size - 1 >> 6 * sizeToLevel) + 1;
-    INT point_any = ofLeftBit( toContiBit(~AS->ptr[ofMaskPoint8(0, level)], size) );
+    INT point_any = 0; //ofLeftBit( toContiBit(~AS->ptr[ofMaskPoint8(0, level)], size) );
     for(i; sizeToLevel < i - 2; i--) {
         point_any = ( point_any == -1 ? point_any : CallFindMaskPoint0X(AS, i, point_any) );
     }
@@ -190,21 +190,23 @@ INT ASofMemoryPoint(ARAS AS, INT arg_size) {
             mask |= ((INT)(toContiBit((~AS->ptr[ofMaskPoint8( (point_any << 6) + i, low)]), size) != 0) << i);
             //printf("<mask: %lu><i: %d>\n", mask, i);
         }
-        index_any_64 = ofLeftBit( mask ) + (point_any << 6);
-        //printf("<code: %lb>", mask);
+        INT point_any_64 = ofLeftBit( mask ) + (point_any << 6);
+        index_any_64 = CallFindMaskPoint0X(AS, low, point_any_64);
+        //printf("<code: %ld>", point_any_64);
     }
     INT index_any = (1<i) ? index_any_64 : index_any_0;
-    INT point_all = ofLeftBit( ~AS->ptr[ofMaskPoint8(0, level)] );
-    for(int i = level - 1; sizeToLevel < i; i--) {
+    INT point_all = CallFindMaskPoint0X(AS, level, 0); // 중단점
+    for(int i = level - 1; sizeToLevel < i - 1; i--) {
         point_all = ( point_all == -1 ? point_all : CallFindMaskPoint00(AS, i, point_all) );
     }
     if(1 << 24 < AS->ptr_size) {
         printf("<s: %ld %d %ld>", level, sizeToLevel, index_any_64);
         //printf("<0: %ld, 1: %ld>", AS->ptr[ofMaskPoint8(0, 1)], AS->ptr[ofMaskPoint8(1, 1)]);
+        //assert( 0 && "max size" );
         return AS->ptr_size;
     }
-    //printf("<t: %ld %ld %ld>", index_any, point_all, point_any);
-    INT return_index = (index_any != -1 ? point_all: index_any);
+    printf("<t: %ld %ld %ld>", index_any, point_all, point_any);
+    INT return_index = (index_any == -1 ? point_all: index_any);
     if(point_all == -1) {
         ASExtendSpace(AS);
     }
