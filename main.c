@@ -213,8 +213,8 @@ INT ASofMemoryPoint(ARAS AS, INT arg_size) {
     return point_all == -1 ? ASofMemoryPoint(AS, arg_size) : return_index;
 }
 
-FN ASsetFillMask() {
-    
+FN ASsetFillMask(INT point, INT index, INT size) {
+    return FLOW_NONE;
 }
 
 INT tastCase(INT value, INT size, INT R) {
