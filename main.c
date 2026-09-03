@@ -181,7 +181,7 @@ INT ASofMemoryPoint(ARAS AS, INT arg_size) {
     for(i; sizeToLevel < i - 2; i--) {
         point_any = ( point_any == -1 ? point_any : CallFindMaskPoint0X(AS, i, point_any) );
     }
-    INT index_any_0 = point_any;
+    INT index_any_0 = CallFindMaskPoint0X(AS, 1, point_any);
     INT index_any_64 = 0;
     if( 1 < i ) {
         INT mask = 0;
@@ -205,12 +205,16 @@ INT ASofMemoryPoint(ARAS AS, INT arg_size) {
         //assert( 0 && "max size" );
         return AS->ptr_size;
     }
-    printf("<t: %ld %ld %ld>", index_any, point_all, point_any);
+    //printf("<t: %ld %ld %ld>", index_any, point_all, point_any);
     INT return_index = (index_any == -1 ? point_all: index_any);
     if(point_all == -1) {
         ASExtendSpace(AS);
     }
     return point_all == -1 ? ASofMemoryPoint(AS, arg_size) : return_index;
+}
+
+FN ASsetFillMask() {
+    
 }
 
 INT tastCase(INT value, INT size, INT R) {
