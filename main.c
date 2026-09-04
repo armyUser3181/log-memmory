@@ -23,7 +23,7 @@ struct AS {
 typedef FLOW FN;
 typedef uint64_t INT;
 
-INT ofLeftBit(INT value) {
+static INT ofLeftBit(INT value) {
     if(!value) return -1;
     INT index = 0;
     for(int i = 1; i < 7; i++) {
@@ -37,7 +37,7 @@ INT ofLeftBit(INT value) {
     return index;
 }
 
-INT ofRightBit(INT value) {
+static INT ofRightBit(INT value) {
     if(!value) return -1;
     INT index = 0;
     for(int i = 1; i < 7; i++) {
@@ -51,7 +51,7 @@ INT ofRightBit(INT value) {
     return index;
 }
 
-INT toContiBit(INT value, INT size) {
+static INT toContiBit(INT value, INT size) {
 
     for(int i = 0; i < 4; i++) {
         INT play = (1 << i);
@@ -68,7 +68,6 @@ INT toContiBit(INT value, INT size) {
         INT RV = play * bcmp;
         value = ((value >> RV) & value);
         size -= RV;
-        //printf("%ld %ld %ld\t%lb\n", size, play, bcmp, value);
     }
 
     for(int i = 0; i < 1; i++) {
@@ -77,7 +76,6 @@ INT toContiBit(INT value, INT size) {
         INT RV = play * bcmp;
         value = ((value >> RV) & value);
         size -= RV;
-        //printf("%ld %ld %ld\t%lb\n", size, play, bcmp, value);
     }
 
     /* for(int i = 1; i < size; i++) {
@@ -87,7 +85,7 @@ INT toContiBit(INT value, INT size) {
     return value;
 }
 
-INT toContiBitLow(INT value, INT size) {
+static INT toContiBitLow(INT value, INT size) {
     for(int i = 1; i < size; i++) {
         value = ((value >> 1) & value);
     }
@@ -110,7 +108,7 @@ inline static INT ofStartMaskPoint8(INT low, INT level) {
 
 typedef struct AS * const ARAS;
 
-struct AS * createAS() {
+static struct AS * createAS() {
     ARAS AS = malloc( sizeof(struct AS) );
     if(!AS) return NULL;
     AS->ptr_size = 1 << 6;
@@ -124,22 +122,22 @@ struct AS * createAS() {
     return AS;
 }
 
-struct AS * destroyAS(ARAS AS) {
+static struct AS * destroyAS(ARAS AS) {
     free(AS->ptr); free(AS);
     return NULL;
 }
 
-inline static INT ASofLevel(INT size) {
+inline static INT ofLevel(INT size) {
     return (63 - ofRightBit(size)) / 6;
 }
 
-FN ASExtendSpace(ARAS AS) {
+static FN ExtendSpace(ARAS AS) {
     uint64_t size = AS->ptr_size;
     AS->ptr_size <<= 2;
     uint64_t * ptr = realloc(AS->ptr, AS->ptr_size * sizeof( uint64_t ) << 3 );
     if(!ptr) return FLOW_ERROR;
     AS->ptr = ptr;
-    INT level = ASofLevel(AS->ptr_size);
+    INT level = ofLevel(AS->ptr_size);
     int64_t low = ofStartMaskPoint8(size << 3, level), high = ofStartMaskPoint8(AS->ptr_size << 3, level);
     //printf("<<level: %ld>>\n", level);
     for(int i = low + 1; i <= high; i++) {
@@ -171,9 +169,9 @@ inline static INT CallFindMaskPoint0X(ARAS AS, INT level, INT point) {
     return ofLeftBit( ~all ) + ( point << 6 );
 }
 
-INT ASofMemoryPoint(ARAS AS, INT arg_size) {
-    int sizeToLevel = ASofLevel(arg_size);
-    INT level = ASofLevel(AS->ptr_size);
+static INT FindMemory(ARAS AS, INT arg_size) {
+    int sizeToLevel = ofLevel(arg_size);
+    INT level = ofLevel(AS->ptr_size);
     int i = level;
     INT space_size = 1 << 6 * level + 3;
     INT size = (arg_size - 1 >> 6 * sizeToLevel) + 1;
@@ -208,20 +206,39 @@ INT ASofMemoryPoint(ARAS AS, INT arg_size) {
     //printf("<t: %ld %ld %ld>", index_any, point_all, point_any);
     INT return_index = (index_any == -1 ? point_all: index_any);
     if(point_all == -1) {
-        ASExtendSpace(AS);
+        ExtendSpace(AS);
     }
-    return point_all == -1 ? ASofMemoryPoint(AS, arg_size) : return_index;
+    return point_all == -1 ? FindMemory(AS, arg_size) : return_index;
 }
 
-FN ASsetFillMask(INT point, INT index, INT size) {
+inline static FN FillMask(ARAS AS, INT point, INT level, uint32_t index, uint32_t size) {
+    point = ofMaskPoint8(point, level);
+    INT mask = ~(~0ULL << size) << index;
+    AS->ptr[point] |= mask;
     return FLOW_NONE;
 }
 
-INT tastCase(INT value, INT size, INT R) {
+static FN upLevelingMask(ARAS AS, INT point, INT level) {
+    point = ofMaskPoint8(point, level);
+    INT child = AS->ptr[point], childIndex = 0;
+    for( int max = ofLevel(AS->ptr_size); level < max; level++ ) {
+        INT index = ofStartMaskPoint8(point, level) + 1;
+        point = ofMaskPoint8(index, level);
+        INT parent = AS->ptr[point];
+        INT target01 = ( 0ULL != child ? 1 : 0 );
+        INT target10 = ( ~0ULL == child ? 1 : 0 );
+        // 중단점 실제 전파 반영 해야함
+        child = parent;
+        childIndex = index;
+    }
+    return FLOW_NONE;
+}
+
+static INT tastCase(INT value, INT size, INT R) {
     return toContiBit(value, size) + R;
 }
 
-clock_t ofTimeTast(ARAS AS) {
+static clock_t ofTimeTast(ARAS AS) {
     volatile const char* rs = FLOW_NONE;
     volatile INT code[1<<10] = {0};
     int top = 0;
@@ -238,6 +255,11 @@ clock_t ofTimeTast(ARAS AS) {
         top = top % (1<<10) + 1;
     } */
     return clock() - t;
+}
+
+static FN tastFunction(ARAS AS) {
+    INT point = (512 << 6) - 5;
+    printf("<1: %ld, 2: %ld, 3: %ld>", ofStartMaskPoint8(point, 1) + 1, ofStartMaskPoint8(point, 2) + 1, ofStartMaskPoint8(point, 3) + 1);
 }
 
 int main(int argc, char *argv[]) {
@@ -259,21 +281,25 @@ int main(int argc, char *argv[]) {
     struct AS * AS = createAS();
     printf("<count: %d>\n", printf("<%lb>\n<%lb>\n-----\n", TASTINT, toContiBitLow(TASTINT, 31)) - ( 5 + 4 + 3 ) );
     /* for(int i = 0; i < 10; i++) {
-        ASExtendSpace(AS);
+        ExtendSpace(AS);
     } */
     /* AS->ptr[ofMaskPoint8(0, 4)] = 0b11;
     AS->ptr[ofMaskPoint8(2, 3)] = 0b111;
     AS->ptr[ofMaskPoint8(131, 2)] = 0b01;
     AS->ptr[ofMaskPoint8(131*64+1, 1)] = 0b0000000000000000000000000000000000000000000000000100001000010001; */
-    //ASofMemoryPoint(AS, 32);
+    //FindMemory(AS, 32);
     AS->ptr[ofMaskPoint8(0, 1)] = 0b1111111111111111111111111111111111111111111111111111111111111111;
-    //printf("<level: %ld>", ASofLevel(64) );
+    //printf("<level: %ld>", ofLevel(64) );
     printf("<AS|size: %ld>", AS->ptr_size << 6);
-    printf("<point: %ld>", ASofMemoryPoint(AS, 32));
+    printf("<point: %ld>", FindMemory(AS, 32));
     puts("");
     printf("<size: %ld>", AS->ptr_size);
     printf("<rpo: %ld>", ofMaskPoint8(0, 2));
     printf("<time: %lf>\n", (double)ofTimeTast(AS) / (1<<10) );
+    puts("");
+    printf("tast: ");
+    tastFunction(AS);
+    puts("");
     AS = destroyAS(AS);
     return 0;
 }
