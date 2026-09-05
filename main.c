@@ -218,18 +218,32 @@ inline static FN FillMask(ARAS AS, INT point, INT level, uint32_t index, uint32_
     return FLOW_NONE;
 }
 
-static FN upLevelingMask(ARAS AS, INT point, INT level) {
-    point = ofMaskPoint8(point, level);
-    INT child = AS->ptr[point], childIndex = 0;
-    for( int max = ofLevel(AS->ptr_size); level < max; level++ ) {
-        INT index = ofStartMaskPoint8(point, level) + 1;
-        point = ofMaskPoint8(index, level);
-        INT parent = AS->ptr[point];
-        INT target01 = ( 0ULL != child ? 1 : 0 );
-        INT target10 = ( ~0ULL == child ? 1 : 0 );
-        // 중단점 실제 전파 반영 해야함
+typedef struct {
+    INT mask10;
+    INT mask01;
+    INT point;
+    INT index;
+} MASK;
+
+static FN upLevelingMask(ARAS AS, INT index, INT level) { // 함수 완성 작업까지가 중단점
+    MASK child, parent, current;
+    child.index = index;
+    child.point = ofMaskPoint8(child.index, level);
+    child.mask01 = AS->ptr[child.point+1];
+    child.mask10 = AS->ptr[child.point+0];
+    level + 1;
+    for( int max = ofLevel(AS->ptr_size); level <= max; level++ ) {
+        parent.index = ofStartMaskPoint8(child.point, level) + 1;
+        parent.point = ofMaskPoint8(parent.index, level);
+        parent.mask01 = AS->ptr[parent.point + 1];
+        parent.mask10 = AS->ptr[parent.point];
+        current.mask01 = ( 0ULL != child.mask01 ? 1 : 0 );
+        current.mask10 = ( ~0ULL == child.mask10 ? 1 : 0 );
+        INT pointMask = ( 1 << child.index );
+        current.mask01 = ( current.mask01 << child.index );
+        current.mask10 = ( current.mask10 << child.index );
+        // 중단점 parent에 데이터를 반영 하는것
         child = parent;
-        childIndex = index;
     }
     return FLOW_NONE;
 }
@@ -259,7 +273,11 @@ static clock_t ofTimeTast(ARAS AS) {
 
 static FN tastFunction(ARAS AS) {
     INT point = (512 << 6) - 5;
-    printf("<1: %ld, 2: %ld, 3: %ld>", ofStartMaskPoint8(point, 1) + 1, ofStartMaskPoint8(point, 2) + 1, ofStartMaskPoint8(point, 3) + 1);
+    printf("<1: %ld, 2: %ld, 3: %ld>\n", ofStartMaskPoint8(point, 1) + 1, ofStartMaskPoint8(point, 2) + 1, ofStartMaskPoint8(point, 3) + 1);
+    
+    FN flow = FLOW_NONE;
+    flow = upLevelingMask(AS, 0, 1);
+    printf("<1: %ld, 2: %ld>\n", AS->ptr[ofMaskPoint8(0, 1)], AS->ptr[ofMaskPoint8(0, 2)]);
 }
 
 int main(int argc, char *argv[]) {
