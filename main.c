@@ -178,12 +178,12 @@ static FN ExtendSpace(ARAS AS)
     return FLOW_NONE;
 }
 
-inline static INT CallFindMaskPoint01(ARAS AS, INT level, INT point)
+inline static FN toMask00(ARAS AS, INT level, INT point, INT index, INT any) // 중단점 // 테스트
 {
-    INT maskPoint = ofMaskPoint8(point, level);
-    INT all = AS->ptr[maskPoint];
-    INT any = AS->ptr[maskPoint];
-    return ofLeftBit(~all & any) + (point << 6);
+    point = ofMaskPoint8(point, level);
+    any = (any >> index) & 1;
+    AS->ptr[point] = ( any ? AS->ptr[point] : 0 );
+    return FLOW_NONE;
 }
 
 inline static INT CallFindMaskPoint00(ARAS AS, INT level, INT point)
