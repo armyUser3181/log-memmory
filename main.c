@@ -322,6 +322,17 @@ static FN upLevelingMask(ARAS AS, INT index, INT level)
     return FLOW_NONE;
 }
 
+static INT allocMemory(ARAS AS, INT size) {
+    INT hendle = FindMemory(AS, size);
+    INT sizeLevel = ofLevel(size);
+    INT maskSize = 1 << sizeLevel * 6;
+    INT elementSize = maskSize >> 6;
+    INT point = ofStartMaskPoint8(hendle, sizeLevel) + 1;
+    INT index = (hendle - point * 8) / elementSize;
+    INT argSize; // 중단점
+    //FillMask(AS, )
+}
+
 static INT tastCase(INT value, INT size, INT R)
 {
     return toContiBit(value, size) + R;
