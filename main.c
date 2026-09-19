@@ -218,7 +218,7 @@ static INT FindMemory(ARAS AS, INT arg_size)
     int workLevel = spaceLevel;
     INT spaceSize = 1 << 6 * spaceLevel + 3;
     INT workRange = (arg_size - 1 >> 6 * currentLevel) + 1;
-    
+
     // any 계산
     INT point_any = 0; // ofLeftBit( toContiBit(~AS->ptr[ofMaskPoint8(0, level)], size) );
     for (; currentLevel < workLevel - 2; workLevel--) point_any = (point_any == -1 ? point_any : CallFindMaskPoint0X(AS, workLevel, point_any));
@@ -235,7 +235,11 @@ static INT FindMemory(ARAS AS, INT arg_size)
     // all 계산
     INT point_all = CallFindMaskPoint0X(AS, spaceLevel, 0);
     for (; currentLevel < workLevel - 1; workLevel--) point_all = (point_all == -1 ? point_all : CallFindMaskPoint00(AS, workLevel, point_all));
-    for (; currentLevel < workLevel; workLevel--) point_all = CallFindMaskContiPoint(AS, spaceLevel, point_all, arg_size);
+    for (; currentLevel < workLevel; workLevel--) {
+        printf("%ld %ld", ofMaskPoint8(point_all, workLevel), AS->ptr_size << 3);
+        //point_all = CallFindMaskContiPoint(AS, workLevel, point_all, arg_size);
+        return 0;
+    }
 
     // debug code
     if (1 << 24 < AS->ptr_size) {
@@ -411,6 +415,7 @@ int main(int argc, char *argv[])
     // printf("<level: %ld>", ofLevel(64) );
     printf("<AS|size: %ld>", AS->ptr_size << 6);
     printf("<point: %ld>", FindMemory(AS, 32));
+    return 0;
     puts("");
     printf("<size: %ld>", AS->ptr_size);
     printf("<rpo: %ld>", ofMaskPoint8(1, 0));
