@@ -169,12 +169,15 @@ static FN ExtendSpace(ARAS AS)
     INT level = ofLevel(AS->ptr_size);
     int64_t low = ofStartMaskPoint8(size << 3, level), high = ofStartMaskPoint8(AS->ptr_size << 3, level);
     // printf("<<level: %ld>>\n", level);
+    int count = 0;
     for (int i = low + 1; i <= high; i++)
     {
         INT point = ofMaskPoint8(i, level);
         AS->ptr[point] = 0;
         AS->ptr[point + 1] = 0;
+        count++;
     }
+    printf("\033[0;31m<%d, %ld>\033[0m", (count), (high - low) );
     return FLOW_NONE;
 }
 
@@ -399,15 +402,14 @@ int main(int argc, char *argv[])
     } */
     struct AS *AS = createAS();
     printf("<count: %d>\n", printf("<%lb>\n<%lb>\n-----\n", TASTINT, toContiBitLow(TASTINT, 31)) - (5 + 4 + 3));
-    /* for(int i = 0; i < 10; i++) {
+    for(int i = 0; i < 10; i++) {
         ExtendSpace(AS);
-    } */
+    }
     /* AS->ptr[ofMaskPoint8(0, 4)] = 0b11;
     AS->ptr[ofMaskPoint8(2, 3)] = 0b111;
     AS->ptr[ofMaskPoint8(131, 2)] = 0b01;
     AS->ptr[ofMaskPoint8(131*64+1, 1)] = 0b0000000000000000000000000000000000000000000000000100001000010001; */
     // FindMemory(AS, 32);
-    ExtendSpace(AS); ExtendSpace(AS);
     AS->ptr[ofMaskPoint8(0, 1)] = 0b1100000000000000000000000000000001111111111111111111111111111111;
     AS->ptr[ofMaskPoint8(0, 1) + 1] = FULLINT;
     //AS->ptr[ofMaskPoint8(1, 1)] = 0b0000000000000000000000000000000011111111111111111111111111111110;
@@ -415,7 +417,6 @@ int main(int argc, char *argv[])
     // printf("<level: %ld>", ofLevel(64) );
     printf("<AS|size: %ld>", AS->ptr_size << 6);
     printf("<point: %ld>", FindMemory(AS, 32));
-    return 0;
     puts("");
     printf("<size: %ld>", AS->ptr_size);
     printf("<rpo: %ld>", ofMaskPoint8(1, 0));
