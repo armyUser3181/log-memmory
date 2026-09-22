@@ -177,7 +177,7 @@ static FN ExtendSpace(ARAS AS)
         AS->ptr[point + 1] = 0;
         count++;
     }
-    printf("\033[0;31m<%d, %ld>\033[0m", (count), (high - low) );
+    printf("\033[0;31m<%d, %ld, %ld>\033[0m", (count), (high - low), high );
     return FLOW_NONE;
 }
 
@@ -214,6 +214,35 @@ inline static INT CallFindMaskContiPoint(ARAS AS, INT level, INT point, INT size
     return ofLeftBit(mask) + (point << 6);
 }
 
+typedef struct {
+    INT all;
+    INT any;
+} MASK2;
+
+static MASK2 createVirtualTopMask(ARAS AS) {
+    INT level = ofLevel(AS->ptr_size);
+    INT high = ofStartMaskPoint8(AS->ptr_size << 3, level);
+   /*  INT buffer[64][2] = { 0 };
+    for(int i = 0; i <= high; i++) {
+        buffer[i][0] = AS->ptr[ofMaskPoint8(i, level)];
+        buffer[i][1] = AS->ptr[ofMaskPoint8(i, level) + 1];
+    }
+    memset( (void*)buffer[high], -1, sizeof(buffer) - ( (char*)buffer[high] - (char*)buffer ) ); */
+    INT mask_all = 0;
+    INT mask_any = 0;
+    int i = 0;
+    for(; i <= high; i++) {
+        INT all = AS->ptr[ofMaskPoint8(i, level)];
+        INT any = AS->ptr[ofMaskPoint8(i, level) + 1];
+        mask_all |= ( ~all == 0 ) << i;
+        mask_any |= ( (all & any) != 0 ) << i;
+    }
+    mask_all = ~0ULL << i;
+    mask_any = ~0ULL << i;
+    MASK2 mask = { .all = mask_all, .any = mask_any };
+    return mask;
+}
+
 static INT FindMemory(ARAS AS, INT arg_size)
 {
     int currentLevel = ofLevel(arg_size);
@@ -221,9 +250,10 @@ static INT FindMemory(ARAS AS, INT arg_size)
     int workLevel = spaceLevel;
     INT spaceSize = 1 << 6 * spaceLevel + 3;
     INT workRange = (arg_size - 1 >> 6 * currentLevel) + 1;
+    MASK2 workMask = createVirtualTopMask(AS);
 
     // any 계산
-    INT point_any = 0; // ofLeftBit( toContiBit(~AS->ptr[ofMaskPoint8(0, level)], size) );
+    INT point_any = ofLeftBit(workMask.any); // ofLeftBit( toContiBit(~AS->ptr[ofMaskPoint8(0, level)], size) );
     for (; currentLevel < workLevel - 2; workLevel--) point_any = (point_any == -1 ? point_any : CallFindMaskPoint0X(AS, workLevel, point_any));
     for (INT mask = 0, low = workLevel-1; currentLevel < workLevel - 1; workLevel--) {
         for (int i = 0; i < 64; i++) mask |= ((INT)(toContiBit((~AS->ptr[ofMaskPoint8((point_any << 6) + i, low)]), workRange) != 0) << i);
@@ -236,7 +266,7 @@ static INT FindMemory(ARAS AS, INT arg_size)
     workLevel = spaceLevel;
 
     // all 계산
-    INT point_all = CallFindMaskPoint0X(AS, spaceLevel, 0);
+    INT point_all = ofLeftBit(workMask.all);
     for (; currentLevel < workLevel - 1; workLevel--) point_all = (point_all == -1 ? point_all : CallFindMaskPoint00(AS, workLevel, point_all));
     for (; currentLevel < workLevel; workLevel--) {
         printf("%ld %ld", ofMaskPoint8(point_all, workLevel), AS->ptr_size << 3);
@@ -272,11 +302,11 @@ typedef struct
     INT mask01;
     INT point;
     INT index;
-} MASK;
+} MASK4;
 
 static FN upLevelingMask(ARAS AS, INT index, INT level)
 {
-    MASK child, parent, current;
+    MASK4 child, parent, current;
     child.index = index;
     child.point = ofMaskPoint8(child.index, level);
     child.mask01 = AS->ptr[child.point + 1];
