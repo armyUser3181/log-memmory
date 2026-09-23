@@ -251,9 +251,10 @@ static INT FindMemory(ARAS AS, INT arg_size)
     INT spaceSize = 1 << 6 * spaceLevel + 3;
     INT workRange = (arg_size - 1 >> 6 * currentLevel) + 1;
     MASK2 workMask = createVirtualTopMask(AS);
-
+    
     // any 계산
-    INT point_any = ofLeftBit(workMask.any); // ofLeftBit( toContiBit(~AS->ptr[ofMaskPoint8(0, level)], size) );
+    INT point_any = ofLeftBit(~workMask.all);
+    // ofLeftBit( toContiBit(~AS->ptr[ofMaskPoint8(0, level)], size) );
     for (; currentLevel < workLevel - 2; workLevel--) point_any = (point_any == -1 ? point_any : CallFindMaskPoint0X(AS, workLevel, point_any));
     for (INT mask = 0, low = workLevel-1; currentLevel < workLevel - 1; workLevel--) {
         for (int i = 0; i < 64; i++) mask |= ((INT)(toContiBit((~AS->ptr[ofMaskPoint8((point_any << 6) + i, low)]), workRange) != 0) << i);
@@ -264,24 +265,23 @@ static INT FindMemory(ARAS AS, INT arg_size)
     }
     INT index_any = point_any;
     workLevel = spaceLevel;
-
+    
     // all 계산
-    INT point_all = ofLeftBit(workMask.all);
+    INT point_all = ofLeftBit(~workMask.all);
     for (; currentLevel < workLevel - 1; workLevel--) point_all = (point_all == -1 ? point_all : CallFindMaskPoint00(AS, workLevel, point_all));
     for (; currentLevel < workLevel; workLevel--) {
         printf("%ld %ld", ofMaskPoint8(point_all, workLevel), AS->ptr_size << 3);
         //point_all = CallFindMaskContiPoint(AS, workLevel, point_all, arg_size);
-        return 0;
     }
-
+    
     // debug code
-    if (1 << 24 < AS->ptr_size) {
+    /* if (1 << 24 < AS->ptr_size) {
         printf("<s: %ld %d %ld>", spaceLevel, currentLevel, point_any);
         // printf("<0: %ld, 1: %ld>", AS->ptr[ofMaskPoint8(0, 1)], AS->ptr[ofMaskPoint8(1, 1)]);
         // assert( 0 && "max size" );
         return AS->ptr_size;
-    }
-    // printf("<t: %ld %ld %ld>", index_any, point_all, point_any);
+    } */
+    printf("<t: %ld %ld %ld>", index_any, point_all, point_any);
 
     INT return_index = (index_any == -1 ? point_all : index_any);
     if (point_all == -1) ExtendSpace(AS);
@@ -407,9 +407,11 @@ static FN tastFunction(ARAS AS)
     printf("<1: %ld, 2: %ld, 3: %ld>\n", ofStartMaskPoint8(point, 1) + 1, ofStartMaskPoint8(point, 2) + 1, ofStartMaskPoint8(point, 3) + 1);
 
     FN flow = FLOW_NONE;
-    printf("<1: %ld, 2: %ld>\n", AS->ptr[ofMaskPoint8(0, 1)], AS->ptr[ofMaskPoint8(0, 2)]);
+    /* printf("<1: %lb, 2: %lb>\n", AS->ptr[ofMaskPoint8(0, 1)], AS->ptr[ofMaskPoint8(0, 2)]);
     flow = upLevelingMask(AS, 0, 1);
-    printf("<1: %ld, 2: %ld>\n", AS->ptr[ofMaskPoint8(0, 1)], AS->ptr[ofMaskPoint8(0, 2)]);
+    printf("<1: %lb, 2: %lb>\n", AS->ptr[ofMaskPoint8(0, 1)], AS->ptr[ofMaskPoint8(0, 2)]); */
+    
+    return flow;
 }
 
 int main(int argc, char *argv[])
@@ -440,12 +442,13 @@ int main(int argc, char *argv[])
     AS->ptr[ofMaskPoint8(131, 2)] = 0b01;
     AS->ptr[ofMaskPoint8(131*64+1, 1)] = 0b0000000000000000000000000000000000000000000000000100001000010001; */
     // FindMemory(AS, 32);
-    AS->ptr[ofMaskPoint8(0, 1)] = 0b1100000000000000000000000000000001111111111111111111111111111111;
+    AS->ptr[ofMaskPoint8(0, 1)] = 0b1100000000000000000000000000000000111111111111111111111111111111;
     AS->ptr[ofMaskPoint8(0, 1) + 1] = FULLINT;
+    //AS->ptr[ofMaskPoint8(0, 1)] = FULLINT;
     //AS->ptr[ofMaskPoint8(1, 1)] = 0b0000000000000000000000000000000011111111111111111111111111111110;
     //AS->ptr[ofMaskPoint8(1, 1) + 1] = FULLINT;
     // printf("<level: %ld>", ofLevel(64) );
-    printf("<AS|size: %ld>", AS->ptr_size << 6);
+    printf("<AS|size: %ld>", 63 - ofRightBit(AS->ptr_size << 6));
     printf("<point: %ld>", FindMemory(AS, 32));
     puts("");
     printf("<size: %ld>", AS->ptr_size);
@@ -453,7 +456,7 @@ int main(int argc, char *argv[])
     printf("<time: %lf>\n", (double)ofTimeTast(AS) / (1 << 10));
     puts("");
     printf("tast: ");
-    //tastFunction(AS);
+    tastFunction(AS);
     // end
     puts("");
     AS = destroyAS(AS);
