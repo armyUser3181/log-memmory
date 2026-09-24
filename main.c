@@ -235,7 +235,7 @@ static MASK2 createVirtualTopMask(ARAS AS) {
         INT all = AS->ptr[ofMaskPoint8(i, level)];
         INT any = AS->ptr[ofMaskPoint8(i, level) + 1];
         mask_all |= ( ~all == 0 ) << i;
-        mask_any |= ( (all & any) != 0 ) << i;
+        mask_any |= ( (all | any) != 0 ) << i;
     }
     mask_all = ~0ULL << i;
     mask_any = ~0ULL << i;
@@ -251,6 +251,7 @@ static INT FindMemory(ARAS AS, INT arg_size)
     INT spaceSize = 1 << 6 * spaceLevel + 3;
     INT workRange = (arg_size - 1 >> 6 * currentLevel) + 1;
     MASK2 workMask = createVirtualTopMask(AS);
+    printf("\033[7;32m\n<%64lb %64lb>\n\033[0;0m", workMask.all, workMask.any);
     
     // any 계산
     INT point_any = ofLeftBit(~workMask.all);
@@ -268,10 +269,16 @@ static INT FindMemory(ARAS AS, INT arg_size)
     
     // all 계산
     INT point_all = ofLeftBit(~workMask.all);
-    for (; currentLevel < workLevel - 1; workLevel--) point_all = (point_all == -1 ? point_all : CallFindMaskPoint00(AS, workLevel, point_all));
+    //for (; currentLevel < workLevel - 1; workLevel--) point_all = (point_all == -1 ? point_all : CallFindMaskPoint00(AS, workLevel, point_all));
+    for (; currentLevel < workLevel - 1; workLevel--) {
+        printf("<%d %lb>", workLevel, point_all);
+        point_all = (point_all == -1 ? point_all : CallFindMaskPoint00(AS, workLevel, point_all));
+
+    }
+    puts("end");
     for (; currentLevel < workLevel; workLevel--) {
-        printf("%ld %ld", ofMaskPoint8(point_all, workLevel), AS->ptr_size << 3);
-        //point_all = CallFindMaskContiPoint(AS, workLevel, point_all, arg_size);
+        printf("<dh%ld %ld %d>", ofMaskPoint8(point_all, workLevel), AS->ptr_size << 3, workLevel);
+        point_all = CallFindMaskContiPoint(AS, workLevel, point_all, arg_size);
     }
     
     // debug code
@@ -282,7 +289,6 @@ static INT FindMemory(ARAS AS, INT arg_size)
         return AS->ptr_size;
     } */
     printf("<t: %ld %ld %ld>", index_any, point_all, point_any);
-
     INT return_index = (index_any == -1 ? point_all : index_any);
     if (point_all == -1) ExtendSpace(AS);
     return point_all == -1 ? FindMemory(AS, arg_size) : return_index;
@@ -444,6 +450,7 @@ int main(int argc, char *argv[])
     // FindMemory(AS, 32);
     AS->ptr[ofMaskPoint8(0, 1)] = 0b1100000000000000000000000000000000111111111111111111111111111111;
     AS->ptr[ofMaskPoint8(0, 1) + 1] = FULLINT;
+    upLevelingMask(AS, 0, 1);
     //AS->ptr[ofMaskPoint8(0, 1)] = FULLINT;
     //AS->ptr[ofMaskPoint8(1, 1)] = 0b0000000000000000000000000000000011111111111111111111111111111110;
     //AS->ptr[ofMaskPoint8(1, 1) + 1] = FULLINT;
