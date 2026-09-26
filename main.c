@@ -63,7 +63,7 @@ static INT ofRightBit(INT value)
     return index;
 }
 
-static INT toContiBit(INT value, INT size)
+static INT toBitRun(INT value, INT size)
 {
 
     for (int i = 0; i < 4; i++)
@@ -101,7 +101,7 @@ static INT toContiBit(INT value, INT size)
     return value;
 }
 
-static INT toContiBitLow(INT value, INT size)
+static INT toBitRunSlow(INT value, INT size)
 {
     for (int i = 1; i < size; i++)
     {
@@ -205,12 +205,12 @@ inline static INT CallFindMaskPoint0X(ARAS AS, INT level, INT point)
     return ofLeftBit(~all) + (point << 6);
 }
 
-inline static INT CallFindMaskContiPoint(ARAS AS, INT level, INT point, INT size) {
+inline static INT ASFindBitRun(ARAS AS, INT level, INT point, INT size) {
     INT maskPoint = ofMaskPoint8(point, level);
     INT all = AS->ptr[maskPoint];
     INT any = AS->ptr[maskPoint+1];
     INT mask = ~all & ~any;
-    mask = toContiBit(mask, size);
+    mask = toBitRun(mask, size);
     return ofLeftBit(mask) + (point << 6);
 }
 
@@ -255,31 +255,31 @@ static INT FindMemory(ARAS AS, INT arg_size)
     
     // any 계산
     INT point_any = ofLeftBit(~workMask.all);
-    // ofLeftBit( toContiBit(~AS->ptr[ofMaskPoint8(0, level)], size) );
+    // ofLeftBit( toBitRun(~AS->ptr[ofMaskPoint8(0, level)], size) );
     for (; currentLevel < workLevel - 2; workLevel--) point_any = (point_any == -1 ? point_any : CallFindMaskPoint0X(AS, workLevel, point_any));
     for (INT mask = 0, low = workLevel-1; currentLevel < workLevel - 1; workLevel--) {
-        for (int i = 0; i < 64; i++) mask |= ((INT)(toContiBit((~AS->ptr[ofMaskPoint8((point_any << 6) + i, low)]), workRange) != 0) << i);
+        for (int i = 0; i < 64; i++) mask |= ((INT)(toBitRun((~AS->ptr[ofMaskPoint8((point_any << 6) + i, low)]), workRange) != 0) << i);
         point_any = ofLeftBit(mask) + (point_any << 6);
     }
     for (; currentLevel < workLevel; workLevel--) {
-        point_any = CallFindMaskContiPoint(AS, workLevel, point_any, arg_size);
+        point_any = ASFindBitRun(AS, workLevel, point_any, arg_size);
     }
     INT index_any = point_any;
     workLevel = spaceLevel;
     
     // all 계산
-    INT point_all = ofLeftBit(~workMask.all);
+    INT point_all = ofLeftBit(~workMask.all & ~workMask.any);
     //for (; currentLevel < workLevel - 1; workLevel--) point_all = (point_all == -1 ? point_all : CallFindMaskPoint00(AS, workLevel, point_all));
-    for (; currentLevel < workLevel - 1; workLevel--) {
+    for (; currentLevel < workLevel - 2; workLevel--) {
         printf("<%d %lb>", workLevel, point_all);
         point_all = (point_all == -1 ? point_all : CallFindMaskPoint00(AS, workLevel, point_all));
 
     }
-    puts("end");
-    for (; currentLevel < workLevel; workLevel--) {
+    for (; currentLevel < workLevel - 1; workLevel--) {
         printf("<dh%ld %ld %d>", ofMaskPoint8(point_all, workLevel), AS->ptr_size << 3, workLevel);
-        point_all = CallFindMaskContiPoint(AS, workLevel, point_all, arg_size);
+        point_all = ASFindBitRun(AS, workLevel, point_all, arg_size);
     }
+
     
     // debug code
     /* if (1 << 24 < AS->ptr_size) {
@@ -317,51 +317,29 @@ static FN upLevelingMask(ARAS AS, INT index, INT level)
     child.point = ofMaskPoint8(child.index, level);
     child.mask01 = AS->ptr[child.point + 1];
     child.mask10 = AS->ptr[child.point + 0];
-    /* printf("[up:start] index=%llu level=%llu child.point=%llu child.mask10=0x%016llx child.mask01=0x%016llx\n",
-           (unsigned long long)index,
-           (unsigned long long)level,
-           (unsigned long long)child.point,
-           (unsigned long long)child.mask10,
-           (unsigned long long)child.mask01); */
     level += 1;
-
     for (int max = ofLevel(AS->ptr_size); level <= max; level++)
     {
         parent.index = ofStartMaskPoint8(child.point, level) + 1;
         parent.point = ofMaskPoint8(parent.index, level);
         parent.mask01 = AS->ptr[parent.point + 1];
         parent.mask10 = AS->ptr[parent.point];
+
         current.mask01 = (0ULL != child.mask01 ? 1 : 0);
         current.mask10 = (~0ULL == child.mask10 ? 1 : 0);
         INT pointMask = (1 << child.index);
         current.mask01 = (current.mask01 << child.index);
         current.mask10 = (current.mask10 << child.index);
+
         parent.mask01 &= ~pointMask;
         parent.mask10 &= ~pointMask;
         parent.mask01 |= current.mask01;
         parent.mask10 |= current.mask10;
+
         AS->ptr[parent.point + 1] = parent.mask01;
         AS->ptr[parent.point] = parent.mask10;
-        /* printf("[up:step] level=%llu child.index=%llu parent.index=%llu parent.point=%llu\n",
-               (unsigned long long)level,
-               (unsigned long long)child.index,
-               (unsigned long long)parent.index,
-               (unsigned long long)parent.point);
-        printf("[up:mask] parent.before10=0x%016llx parent.before01=0x%016llx pointMask=0x%016llx current10=0x%016llx current01=0x%016llx\n",
-               (unsigned long long)AS->ptr[parent.point],
-               (unsigned long long)AS->ptr[parent.point + 1],
-               (unsigned long long)pointMask,
-               (unsigned long long)current.mask10,
-               (unsigned long long)current.mask01);
-        printf("[up:write] point=%llu mask10=0x%016llx mask01=0x%016llx\n",
-               (unsigned long long)parent.point,
-               (unsigned long long)AS->ptr[parent.point],
-               (unsigned long long)AS->ptr[parent.point + 1]); */
         child = parent;
     }
-    /* printf("[up:end] index=%llu level=%llu\n",
-           (unsigned long long)index,
-           (unsigned long long)level); */
     return FLOW_NONE;
 }
 
@@ -379,7 +357,7 @@ static INT getAlloc(ARAS AS, INT size) {
 
 static INT tastCase(INT value, INT size, INT R)
 {
-    return toContiBit(value, size) + R;
+    return toBitRun(value, size) + R;
 }
 
 static clock_t ofTimeTast(ARAS AS)
@@ -394,13 +372,13 @@ static clock_t ofTimeTast(ARAS AS)
     clock_t t = clock();
     for (int i = 0; i < 1 << 10; i++)
     {
-        /* code[i] = (tastCase(rands[i], rands[i] % 64, rands[i] + i ) == (toContiBitLow(rands[i], rands[i] % 64) + rands[i] + i));
+        /* code[i] = (tastCase(rands[i], rands[i] % 64, rands[i] + i ) == (toBitRunSlow(rands[i], rands[i] % 64) + rands[i] + i));
         printf(code[i] ? "" : "error");
         code[i] = tastCase(rands[i], rands[i] % 64, rands[i] + i); */
     }
     /* for(INT value = 0; ~value != 0ULL; value++ ) for(INT size = 0; size != 65; size++) {
-        //printf("<value: %ld, size: %ld>\n<%lb>\n<%lb>\n", ~value, size, ~value, toContiBit(~value, size));
-        code[top] = ( tastCase(~value, size, rands[top]) == (toContiBitLow(~value, size) + rands[top]));
+        //printf("<value: %ld, size: %ld>\n<%lb>\n<%lb>\n", ~value, size, ~value, toBitRun(~value, size));
+        code[top] = ( tastCase(~value, size, rands[top]) == (toBitRunSlow(~value, size) + rands[top]));
         //if( value == (1ULL << 32) ) printf("f");
         top = top % (1<<10) + 1;
     } */
@@ -439,7 +417,7 @@ int main(int argc, char *argv[])
         printf("<%ld>", ofMaskPoint8(i, 1));
     } */
     struct AS *AS = createAS();
-    printf("<count: %d>\n", printf("<%lb>\n<%lb>\n-----\n", TASTINT, toContiBitLow(TASTINT, 31)) - (5 + 4 + 3));
+    printf("<count: %d>\n", printf("<%lb>\n<%lb>\n-----\n", TASTINT, toBitRunSlow(TASTINT, 31)) - (5 + 4 + 3));
     for(int i = 0; i < 10; i++) {
         ExtendSpace(AS);
     }

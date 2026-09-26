@@ -32,6 +32,8 @@ gcc main.c -o main.e && ./main.e
 
 찾기 과정에서 00을 비우기 필수
 
+중요사항: 할당 사항의 상향식 전파가 없으면 메모리 오류로 결론이 나버림
+
 ### 할당
 
 규칙 1: 찾은 공간의 마스크를 채운다
@@ -61,8 +63,6 @@ gcc main.c -o main.e && ./main.e
 mask를 ptr에 내장함으로써 할게 많이 없어짐
 가장 이론적인 부분임
 
-가상의 가장 상위의 마스크를 조직하여 그 마스크부터 탐색을 지속해야함, 미친
-
 ### 중단점
 
 특정 마스크의 특정 부분을 채우는 함수 // true
@@ -88,3 +88,19 @@ mask를 ptr에 내장함으로써 할게 많이 없어짐
 
             각기 부분은 가상 상위 마스크의 값으로 정의해야함
             
+### 단어 선정
+
+
+parent
+request
+current
+child
+
+level size range space
+point index mask any all
+work
+
+of find get to
+create extend destroy
+
+continual
