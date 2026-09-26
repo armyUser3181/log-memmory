@@ -349,11 +349,15 @@ static INT getAlloc(ARAS AS, INT size) {
     INT power = level * 6 - 6;
     INT range = 64 << power;
     INT element = 1 << power;
-    INT point = ofStartMaskPoint8(hendle, level) + 1;
-    INT index = (hendle - point * 8) / element;
-
-    //FillMask(AS, )
+    //INT point = ofStartMaskPoint8(hendle, level) + 1;
+    //INT index = hendle / element - point * 8;
+    INT point = hendle >> power;
+    INT index = hendle - (point << power);
+    FillMask(AS, point, level, index, size);
+    return hendle + (INT)AS->ptr;
 }
+
+
 
 static INT tastCase(INT value, INT size, INT R)
 {
