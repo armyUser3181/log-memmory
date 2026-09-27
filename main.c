@@ -255,8 +255,8 @@ static INT FindMemory(ARAS AS, INT arg_size)
     }
     for (; currentLevel < workLevel; workLevel--) {
         point_any = ASFindBitRun(AS, workLevel, point_any, arg_size);
-        
     }
+
     INT index_any = point_any;
     workLevel = spaceLevel;
     
@@ -326,11 +326,12 @@ static FN upLevelingMask(ARAS AS, INT index, INT level)
 static void* getAlloc(ARAS AS, INT size) {
     INT hendle = FindMemory(AS, size);
     INT level = ofLevel(size);
-    INT power = level * 6 - 6;
+    INT power = level * 6;
     INT range = 64 << power;
     INT element = 1 << power;
     INT point = hendle >> power;
     INT index = hendle - (point << power);
+    printf("<hendle: %ld, level: %d, power: %d, range: %ld, element: %ld, point: %ld, index: %ld>\n", hendle, level, power, range, element, point, index);
     FillMask(AS, point, level, index, size);
     upLevelingMask(AS, hendle, level);
     return (void*)(hendle + AS->ptr);
@@ -400,6 +401,8 @@ int main(int argc, char *argv[])
     upLevelingMask(AS, 2, 1);
     printf("<AS|size: %ld>", 63 - ofRightBit(AS->ptr_size << 6));
     printf("<point: %ld>", FindMemory(AS, 32));
+    printf("<memory: %p>", getAlloc(AS, 32));
+    printf("<gap: %ld>", (char*)getAlloc(AS, 32) - (char*)AS->ptr);
     puts("");
     printf("<size: %ld>", AS->ptr_size); printf("<rpo: %ld>", ofMaskPoint8(1, 0)); printf("<time: %lf>\n", (double)ofTimeTast(AS) / (1 << 10));
     puts("");
