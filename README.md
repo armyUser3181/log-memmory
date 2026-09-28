@@ -8,7 +8,7 @@ gcc main.c -o main.e && ./main.e
 
 | 탐색 | 할당 | 해제 | 확장 |
 | :---: | :---: | :---: | :---: |
-|  85%  |   25%  |  0%   |  75%  |
+|  90%  |   65%  |  0%   |  80%  |
 | true | goto | false | ture |
 
 ### 탐색
@@ -108,3 +108,12 @@ of find get to
 create extend destroy
 
 continual
+
+### 중요한 논의
+
+시작점인 64바이트 단위의 element로 변경할 날이 왔다.
+
+그렇다면 어떻게 바꿔야 할까?
+
+a * 64 - level * a 이렇게 바꿔야 할까?
+

@@ -227,7 +227,6 @@ static MASK2 createVirtualTopMask(ARAS AS) {
         INT any = AS->ptr[ofMaskPoint8(i, level) + 1];
         mask_all |= ( ~all == 0 ) << i;
         mask_any |= ( (all | any) != 0 ) << i;
-        printf("<i: %d, all: %lb, any: %lb, mask_all: %lb, mask_any: %lb>\n", i, all, any, mask_all, mask_any);
     }
     mask_all = ~0ULL << i;
     mask_any = ~0ULL << i;
@@ -269,7 +268,7 @@ static INT FindMemory(ARAS AS, INT arg_size)
         point_all = ASFindBitRun(AS, workLevel, point_all, arg_size);
     }
     INT index_all = point_all;
-    printf("<index_any: %ld, index_all: %ld>\n", index_any, index_all);
+    //printf("<index_any: %ld, index_all: %ld>\n", index_any, index_all);
 
     return (index_any == -1 ?index_all : index_any);
 }
@@ -331,10 +330,10 @@ static void* getAlloc(ARAS AS, INT size) {
     INT element = 1 << power;
     INT point = hendle >> power;
     INT index = hendle - (point << power);
-    printf("<hendle: %ld, level: %d, power: %d, range: %ld, element: %ld, point: %ld, index: %ld>\n", hendle, level, power, range, element, point, index);
+    //printf("<hendle: %ld, level: %ld, power: %ld, range: %ld, element: %ld, point: %ld, index: %ld>\n", hendle, level, power, range, element, point, index);
     FillMask(AS, point, level, index, size);
     upLevelingMask(AS, hendle, level);
-    return (void*)(hendle + AS->ptr);
+    return (void*)(hendle + AS->ptr); // 8 >> 1
 }
 
 static INT tastCase(INT value, INT size, INT R)
@@ -388,14 +387,14 @@ int main(int argc, char *argv[])
     INT FULLINT = 0b1111111111111111111111111111111111111111111111111111111111111111;
     INT TASTINT = 0b0000000000000000000000000000000011111111111111111111111111111111;
     struct AS *AS = createAS();
-    ExtendSpace(AS); ExtendSpace(AS); ExtendSpace(AS); ExtendSpace(AS);
+    //ExtendSpace(AS); ExtendSpace(AS); ExtendSpace(AS); ExtendSpace(AS);
     
     // start
-    printf("<count: %d>\n", printf("<%lb>\n<%lb>\n-----\n", TASTINT, toBitRunSlow(TASTINT, 31)) - (5 + 4 + 3));
+    //printf("<count: %d>\n", printf("<%lb>\n<%lb>\n-----\n", TASTINT, toBitRunSlow(TASTINT, 31)) - (5 + 4 + 3));
     AS->ptr[ofMaskPoint8(0, 1)] = 0b1100000000000000000000000000000000111111111111111111111111111111;
-    AS->ptr[ofMaskPoint8(1, 1)] = 0b1100000000000000000000000000000000111111111111111111111111111111;
-    AS->ptr[ofMaskPoint8(2, 1)] = 0b1100000000000000000000000000000000111111111111111111111111111111;
-    AS->ptr[ofMaskPoint8(0, 1) + 1] = FULLINT;
+    //AS->ptr[ofMaskPoint8(1, 1)] = 0b1100000000000000000000000000000000111111111111111111111111111111;
+    //AS->ptr[ofMaskPoint8(2, 1)] = 0b1100000000000000000000000000000000111111111111111111111111111111;
+    //AS->ptr[ofMaskPoint8(0, 1) + 1] = FULLINT;
     upLevelingMask(AS, 0, 1);
     upLevelingMask(AS, 1, 1);
     upLevelingMask(AS, 2, 1);
