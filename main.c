@@ -268,7 +268,7 @@ static INT FindMemory(ARAS AS, INT arg_size)
         point_all = ASFindBitRun(AS, workLevel, point_all, arg_size);
     }
     INT index_all = point_all;
-    //printf("<index_any: %ld, index_all: %ld>\n", index_any, index_all);
+    printf("<index_any: %ld, index_all: %ld>\n", index_any, index_all);
 
     return (index_any == -1 ?index_all : index_any);
 }
@@ -331,7 +331,8 @@ static void* getAlloc(ARAS AS, INT size) {
     INT point = hendle >> power;
     INT index = hendle - (point << power);
     //printf("<hendle: %ld, level: %ld, power: %ld, range: %ld, element: %ld, point: %ld, index: %ld>\n", hendle, level, power, range, element, point, index);
-    FillMask(AS, point, level, index, size);
+    FillMask(AS, hendle, level, index, size);
+    
     upLevelingMask(AS, hendle, level);
     return (void*)(hendle + AS->ptr); // 8 >> 1
 }
@@ -372,10 +373,11 @@ static FN tastFunction(ARAS AS)
     printf("<1: %ld, 2: %ld, 3: %ld>\n", ofStartMaskPoint8(point, 1) + 1, ofStartMaskPoint8(point, 2) + 1, ofStartMaskPoint8(point, 3) + 1);
 
     FN flow = FLOW_NONE;
-    /* printf("<1: %lb, 2: %lb>\n", AS->ptr[ofMaskPoint8(0, 1)], AS->ptr[ofMaskPoint8(0, 2)]);
-    flow = upLevelingMask(AS, 0, 1);
-    printf("<1: %lb, 2: %lb>\n", AS->ptr[ofMaskPoint8(0, 1)], AS->ptr[ofMaskPoint8(0, 2)]); */
-    
+    int * p1 = getAlloc(AS, 32);
+    int * p2 = getAlloc(AS, 32);
+    printf("<<%p<<>>%p>>", p1, p2);
+    *p1 = 3; *p2 = 4;
+    printf("<<%d>>", *p1 - *p2 );
     return flow;
 }
 
@@ -396,8 +398,8 @@ int main(int argc, char *argv[])
     //AS->ptr[ofMaskPoint8(2, 1)] = 0b1100000000000000000000000000000000111111111111111111111111111111;
     //AS->ptr[ofMaskPoint8(0, 1) + 1] = FULLINT;
     upLevelingMask(AS, 0, 1);
-    upLevelingMask(AS, 1, 1);
-    upLevelingMask(AS, 2, 1);
+    //upLevelingMask(AS, 1, 1);
+    //upLevelingMask(AS, 2, 1);
     printf("<AS|size: %ld>", 63 - ofRightBit(AS->ptr_size << 6));
     printf("<point: %ld>", FindMemory(AS, 32));
     printf("<memory: %p>", getAlloc(AS, 32));
