@@ -242,6 +242,7 @@ static INT FindMemory(ARAS AS, INT arg_size)
     INT spaceSize = 1 << 6 * spaceLevel + 3;
     INT workRange = (arg_size - 1 >> 6 * currentLevel) + 1;
     MASK2 workMask = createVirtualTopMask(AS);
+    printf("mask %lb\n", workMask.any);
     
     // any 계산
     INT point_any = ofLeftBit(~workMask.all);
@@ -268,7 +269,7 @@ static INT FindMemory(ARAS AS, INT arg_size)
         point_all = ASFindBitRun(AS, workLevel, point_all, arg_size);
     }
     INT index_all = point_all;
-    printf("<index_any: %ld, index_all: %ld>\n", index_any, index_all);
+    //printf("<index_any: %ld, index_all: %ld, level: %ld>\n", index_any, index_all);
 
     return (index_any == -1 ?index_all : index_any);
 }
@@ -328,12 +329,12 @@ static void* getAlloc(ARAS AS, INT size) {
     INT power = level * 6;
     INT range = 64 << power;
     INT element = 1 << power;
-    INT point = hendle >> power;
-    INT index = hendle - (point << power);
-    //printf("<hendle: %ld, level: %ld, power: %ld, range: %ld, element: %ld, point: %ld, index: %ld>\n", hendle, level, power, range, element, point, index);
-    FillMask(AS, hendle, level, index, size);
+    INT point = hendle >> (power + 6);
+    INT index = hendle - (point << (power + 6));
+    //printf("<size: %ld, hendle: %ld, level: %ld, power: %ld, range: %ld, element: %ld, point: %ld, index: %ld>\n", size, hendle, level, power, range, element, point, index);
+    hendle == -1 ? 0 : FillMask(AS, point, level + 1, index, size);
     
-    upLevelingMask(AS, hendle, level);
+    upLevelingMask(AS, hendle == -1 ? 0 : hendle, level + 1);
     return (void*)(hendle + AS->ptr); // 8 >> 1
 }
 
@@ -401,13 +402,18 @@ int main(int argc, char *argv[])
     //upLevelingMask(AS, 1, 1);
     //upLevelingMask(AS, 2, 1);
     printf("<AS|size: %ld>", 63 - ofRightBit(AS->ptr_size << 6));
-    printf("<point: %ld>", FindMemory(AS, 32));
-    printf("<memory: %p>", getAlloc(AS, 32));
-    printf("<gap: %ld>", (char*)getAlloc(AS, 32) - (char*)AS->ptr);
+    //printf("<point: %ld>", FindMemory(AS, 32));
+    //printf("<memory: %p>", getAlloc(AS, 32));
+    printf("\n01: %lb\n", AS->ptr[ofMaskPoint8(0,1)]);
+    printf("<gap: %ld>", (size_t*)getAlloc(AS, 32) - (size_t*)AS->ptr);
+    printf("\n01: %lb\n", AS->ptr[ofMaskPoint8(0,1)]);
+    ExtendSpace(AS);
+    printf("<gap: %ld>", (size_t*)getAlloc(AS, 32) - (size_t*)AS->ptr);
+    printf("\n01: %lb\n", AS->ptr[ofMaskPoint8(0,1)]);
     puts("");
     printf("<size: %ld>", AS->ptr_size); printf("<rpo: %ld>", ofMaskPoint8(1, 0)); printf("<time: %lf>\n", (double)ofTimeTast(AS) / (1 << 10));
     puts("");
-    tastFunction(AS);
+    //tastFunction(AS);
     // end
     puts("");
     AS = destroyAS(AS);
