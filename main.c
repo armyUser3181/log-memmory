@@ -31,7 +31,7 @@ typedef uint64_t INT;
 
 static INT ofLeftBit(INT value)
 {
-    if (!value)
+    if (!value || !~value)
         return -1;
     INT index = 0;
     for (int i = 1; i < 7; i++)
@@ -203,6 +203,7 @@ inline static INT CallFindMaskPoint0X(ARAS AS, INT level, INT point)
 }
 
 inline static INT ASFindBitRun(ARAS AS, INT level, INT point, INT size) {
+    if(point == -1) return -1;
     INT maskPoint = ofMaskPoint8(point, level);
     INT all = AS->ptr[maskPoint];
     INT any = AS->ptr[maskPoint+1];
@@ -225,11 +226,11 @@ static MASK2 createVirtualTopMask(ARAS AS) {
     for(; i <= high; i++) {
         INT all = AS->ptr[ofMaskPoint8(i, level)];
         INT any = AS->ptr[ofMaskPoint8(i, level) + 1];
-        mask_all |= ( ~all == 0 ) << i;
-        mask_any |= ( (all | any) != 0 ) << i;
+        mask_all |= ( ~all == 0ULL ) << i;
+        mask_any |= ( (all | any) != 0ULL ) << i;
     }
-    mask_all = ~0ULL << i;
-    mask_any = ~0ULL << i;
+    mask_all |= ~0ULL << i;
+    mask_any |= ~0ULL << i;
     MASK2 mask = { .all = mask_all, .any = mask_any };
     return mask;
 }
@@ -242,7 +243,8 @@ static INT FindMemory(ARAS AS, INT arg_size)
     INT spaceSize = 1 << 6 * spaceLevel + 3;
     INT workRange = (arg_size - 1 >> 6 * currentLevel) + 1;
     MASK2 workMask = createVirtualTopMask(AS);
-    printf("mask %lb\n", workMask.any);
+    printf("mask %lb\n", workMask.all);
+    
     
     // any 계산
     INT point_any = ofLeftBit(~workMask.all);
@@ -262,6 +264,7 @@ static INT FindMemory(ARAS AS, INT arg_size)
     
     // all 계산
     INT point_all = ofLeftBit(~workMask.all & ~workMask.any);
+    printf("<point_any: %ld, point_all: %ld>\n", point_any, point_all);
     for (; currentLevel < workLevel - 1; workLevel--) {
         point_all = (point_all == -1 ? point_all : CallFindMaskPoint00(AS, workLevel, point_all));
     }
@@ -269,7 +272,7 @@ static INT FindMemory(ARAS AS, INT arg_size)
         point_all = ASFindBitRun(AS, workLevel, point_all, arg_size);
     }
     INT index_all = point_all;
-    //printf("<index_any: %ld, index_all: %ld, level: %ld>\n", index_any, index_all);
+    printf("<index_any: %ld, index_all: %ld>\n", index_any, index_all);
 
     return (index_any == -1 ?index_all : index_any);
 }
@@ -297,6 +300,7 @@ static FN upLevelingMask(ARAS AS, INT index, INT level)
     child.point = ofMaskPoint8(child.index, level);
     child.mask01 = AS->ptr[child.point + 1];
     child.mask10 = AS->ptr[child.point + 0];
+
     level += 1;
     for (int max = ofLevel(AS->ptr_size); level <= max; level++)
     {
@@ -325,16 +329,16 @@ static FN upLevelingMask(ARAS AS, INT index, INT level)
 
 static void* getAlloc(ARAS AS, INT size) {
     INT hendle = FindMemory(AS, size);
+
     INT level = ofLevel(size);
     INT power = level * 6;
     INT range = 64 << power;
     INT element = 1 << power;
     INT point = hendle >> (power + 6);
     INT index = hendle - (point << (power + 6));
-    //printf("<size: %ld, hendle: %ld, level: %ld, power: %ld, range: %ld, element: %ld, point: %ld, index: %ld>\n", size, hendle, level, power, range, element, point, index);
     hendle == -1 ? 0 : FillMask(AS, point, level + 1, index, size);
-    
     upLevelingMask(AS, hendle == -1 ? 0 : hendle, level + 1);
+
     return (void*)(hendle + AS->ptr); // 8 >> 1
 }
 
@@ -407,7 +411,6 @@ int main(int argc, char *argv[])
     printf("\n01: %lb\n", AS->ptr[ofMaskPoint8(0,1)]);
     printf("<gap: %ld>", (size_t*)getAlloc(AS, 32) - (size_t*)AS->ptr);
     printf("\n01: %lb\n", AS->ptr[ofMaskPoint8(0,1)]);
-    ExtendSpace(AS);
     printf("<gap: %ld>", (size_t*)getAlloc(AS, 32) - (size_t*)AS->ptr);
     printf("\n01: %lb\n", AS->ptr[ofMaskPoint8(0,1)]);
     puts("");
