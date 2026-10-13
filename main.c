@@ -298,6 +298,9 @@ static FN upLevelingMask(ARAS AS, INT index, INT level)
     MASK4 child, parent, current;
     child.index = index;
     child.point = ofMaskPoint8(child.index, level);
+    if((AS->ptr_size << 3) <= child.point) { // temp code // 중단점
+        return FLOW_ERROR;
+    }
     child.mask01 = AS->ptr[child.point + 1];
     child.mask10 = AS->ptr[child.point + 0];
 
@@ -410,6 +413,8 @@ int main(int argc, char *argv[])
     //printf("<memory: %p>", getAlloc(AS, 32));
     printf("\n01: %lb\n", AS->ptr[ofMaskPoint8(0,1)]);
     printf("<gap: %ld>", (size_t*)getAlloc(AS, 32) - (size_t*)AS->ptr);
+    ExtendSpace(AS);ExtendSpace(AS);
+    AS->ptr[ofMaskPoint8(1, 1)] = 0b1100000000000000000000000000000000111111111111111111111111111111; // 여기서 공간 없으면 63 에러 -1 에러 나는디
     printf("\n01: %lb\n", AS->ptr[ofMaskPoint8(0,1)]);
     printf("<gap: %ld>", (size_t*)getAlloc(AS, 32) - (size_t*)AS->ptr);
     printf("\n01: %lb\n", AS->ptr[ofMaskPoint8(0,1)]);
