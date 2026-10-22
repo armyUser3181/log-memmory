@@ -129,6 +129,13 @@ inline static INT ofStartMaskPoint8(INT low, INT level)
 
 typedef struct AS *const ARAS;
 
+struct SYSTEM {
+    struct FLOW {
+
+        int ERROR_EVENT;
+    } FLOW;
+} SYSTEM;
+
 static struct AS *createAS()
 {
     ARAS AS = malloc(sizeof(struct AS));
@@ -204,12 +211,26 @@ inline static INT CallFindMaskPoint0X(ARAS AS, INT level, INT point)
 
 inline static INT ASFindBitRun(ARAS AS, INT level, INT point, INT size) {
     if(point == -1) return -1;
+    if(SYSTEM.FLOW.ERROR_EVENT) {
+        printf("\n<<point: %ld, level: %ld, size: %ld>>\n", point, level, size);
+    }
     INT maskPoint = ofMaskPoint8(point, level);
     INT all = AS->ptr[maskPoint];
     INT any = AS->ptr[maskPoint+1];
     INT mask = ~all & ~any;
+    if(SYSTEM.FLOW.ERROR_EVENT) {
+        printf("\n<<maskPoint: %ld, \nmask: %lb, \nall: %lb, \nany: %lb>>\n", maskPoint, mask, all, any);
+    }
+    //printf("\n<<smask: %lb>>\n", mask);
     mask = toBitRun(mask, size);
-    return ofLeftBit(mask) + (point << 6);
+    if(SYSTEM.FLOW.ERROR_EVENT) {
+        printf("\n<<mask: %lb>>\n", mask);
+    }
+    INT index = ofLeftBit(mask);
+    if(SYSTEM.FLOW.ERROR_EVENT) {
+        printf("\n<<index: %ld>>\n", index);
+    }
+    return index + ( index == -1 ? 0 : (point << 6) );
 }
 
 typedef struct {
@@ -243,7 +264,7 @@ static INT FindMemory(ARAS AS, INT arg_size)
     INT spaceSize = 1 << 6 * spaceLevel + 3;
     INT workRange = (arg_size - 1 >> 6 * currentLevel) + 1;
     MASK2 workMask = createVirtualTopMask(AS);
-    printf("mask %lb\n", workMask.all);
+    //printf("mask %lb\n", workMask.all);
     
     
     // any 계산
@@ -253,10 +274,11 @@ static INT FindMemory(ARAS AS, INT arg_size)
     }
     for (INT mask = 0, low = workLevel-1; currentLevel < workLevel - 1; workLevel--) {
         for (int i = 0; i < 64; i++) mask |= ((INT)(toBitRun((~AS->ptr[ofMaskPoint8((point_any << 6) + i, low)]), workRange) != 0) << i);
+
         point_any = ofLeftBit(mask) + (point_any << 6);
     }
     for (; currentLevel < workLevel; workLevel--) {
-        point_any = ASFindBitRun(AS, workLevel, point_any, arg_size);
+        point_any =  point_any == -1 ? point_any : ASFindBitRun(AS, workLevel, point_any, arg_size);
     }
 
     INT index_any = point_any;
@@ -264,7 +286,7 @@ static INT FindMemory(ARAS AS, INT arg_size)
     
     // all 계산
     INT point_all = ofLeftBit(~workMask.all & ~workMask.any);
-    printf("<point_any: %ld, point_all: %ld>\n", point_any, point_all);
+    //printf("<point_any: %ld, point_all: %ld>\n", point_any, point_all);
     for (; currentLevel < workLevel - 1; workLevel--) {
         point_all = (point_all == -1 ? point_all : CallFindMaskPoint00(AS, workLevel, point_all));
     }
@@ -272,7 +294,7 @@ static INT FindMemory(ARAS AS, INT arg_size)
         point_all = ASFindBitRun(AS, workLevel, point_all, arg_size);
     }
     INT index_all = point_all;
-    printf("<index_any: %ld, index_all: %ld>\n", index_any, index_all);
+    //printf("<index_any: %ld, index_all: %ld>\n", index_any, index_all);
 
     return (index_any == -1 ?index_all : index_any);
 }
@@ -375,17 +397,99 @@ static clock_t ofTimeTast(ARAS AS)
     return clock() - t;
 }
 
-static FN tastFunction(ARAS AS)
+static FN tastFunction(void)
 {
-    INT point = (512 << 6) - 5;
-    printf("<1: %ld, 2: %ld, 3: %ld>\n", ofStartMaskPoint8(point, 1) + 1, ofStartMaskPoint8(point, 2) + 1, ofStartMaskPoint8(point, 3) + 1);
+    struct AS *AS = createAS();
+    if (!AS)
+    {
+        fprintf(stderr, "[TEST FAIL] createAS failed\n");
+        return FLOW_ERROR;
+    }
 
     FN flow = FLOW_NONE;
-    int * p1 = getAlloc(AS, 32);
-    int * p2 = getAlloc(AS, 32);
-    printf("<<%p<<>>%p>>", p1, p2);
-    *p1 = 3; *p2 = 4;
-    printf("<<%d>>", *p1 - *p2 );
+    INT allocated_words = AS->ptr_size << 3;
+    for (INT i = 0; i < allocated_words; i++)
+        AS->ptr[i] = 0;
+
+    AS->ptr[ofMaskPoint8(0, 1)] = 0b1100000000000000000000000000000000111111111111111111111111111111;
+    upLevelingMask(AS, 0, 1);
+    size_t *first = getAlloc(AS, 32);
+    INT first_offset = (INT)(first - (size_t *)AS->ptr);
+    printf("[TEST] first allocation offset=%lu expected=30\n", first_offset);
+    if (first_offset != 30)
+    {
+        fprintf(stderr, "[TEST FAIL] initial state did not match the reproduction\n");
+        flow = FLOW_ERROR;
+        goto cleanup;
+    }
+
+    for (int i = 0; i < 4; i++)
+    {
+        INT old_words = AS->ptr_size << 3;
+        if (ExtendSpace(AS) == FLOW_ERROR)
+        {
+            fprintf(stderr, "[TEST FAIL] ExtendSpace failed\n");
+            flow = FLOW_ERROR;
+            goto cleanup;
+        }
+        for (INT word = old_words; word < (AS->ptr_size << 3); word++)
+            AS->ptr[word] = 0;
+    }
+
+    AS->ptr[ofMaskPoint8(1, 1)] = 0b1100000000000000000000000000100000111111111111111111111111111111;
+
+    SYSTEM.FLOW.ERROR_EVENT = 1;
+    INT point_one = ASFindBitRun(AS, 1, 1, 32);
+    INT point_two = ASFindBitRun(AS, 1, 2, 32);
+    SYSTEM.FLOW.ERROR_EVENT = 0;
+    printf("[TEST] point=1 result=%ld expected=no candidate\n", point_one);
+    printf("[TEST] point=2 result=%ld expected=128\n", point_two);
+
+    size_t *second = getAlloc(AS, 32);
+    INT actual_offset = (INT)(second - (size_t *)AS->ptr);
+    printf("[TEST] getAlloc offset=%lu expected=128\n", actual_offset);
+    if (point_one != (INT)-1 || point_two != 128 || actual_offset != 128)
+    {
+        fprintf(stderr, "[TEST FAIL] any search returned a local failure as an allocation instead of continuing\n");
+        flow = FLOW_ERROR;
+    }
+    else
+    {
+        puts("[TEST PASS] any search skipped the fragmented block and used the next block");
+    }
+
+    printf("[TEST] mask 2 1 %lb\n", AS->ptr[ofMaskPoint8(2, 1)]);
+
+    size_t *third = getAlloc(AS, 32);
+    INT third_offset = (INT)(third - (size_t *)AS->ptr);
+    printf("[TEST] third allocation offset=%lu expected=160\n", third_offset);
+    if (third_offset == -1)
+    {
+        fprintf(stderr, "[TEST FAIL] third allocation did not return the expected offset\n");
+        flow = FLOW_ERROR;
+    }
+
+    INT current_find = FindMemory(AS, 32);
+    printf("[TEST] FindMemory point=%ld\n", current_find);
+
+    printf("[TEST] mask 2 1 %lb\n", AS->ptr[ofMaskPoint8(2, 1)]);
+    
+    printf("[TEST] mask 1 1 %lb\n", AS->ptr[ofMaskPoint8(1, 1)]);
+
+    size_t *fourth = getAlloc(AS, 16);
+    INT fourth_offset = (INT)(fourth - (size_t *)AS->ptr);
+    printf("[TEST] fourth allocation offset=%lu expected=100\n", fourth_offset);
+    if (fourth_offset == -1)
+    {
+        fprintf(stderr, "[TEST FAIL] fourth allocation did not return the expected offset\n");
+        flow = FLOW_ERROR;
+    }
+
+    printf("[TEST] mask 1 1 %lb\n", AS->ptr[ofMaskPoint8(1, 1)]);
+    
+
+cleanup:
+    destroyAS(AS);
     return flow;
 }
 
@@ -397,33 +501,8 @@ int main(int argc, char *argv[])
     INT FULLINT = 0b1111111111111111111111111111111111111111111111111111111111111111;
     INT TASTINT = 0b0000000000000000000000000000000011111111111111111111111111111111;
     struct AS *AS = createAS();
-    //ExtendSpace(AS); ExtendSpace(AS); ExtendSpace(AS); ExtendSpace(AS);
-    
-    // start
-    //printf("<count: %d>\n", printf("<%lb>\n<%lb>\n-----\n", TASTINT, toBitRunSlow(TASTINT, 31)) - (5 + 4 + 3));
-    AS->ptr[ofMaskPoint8(0, 1)] = 0b1100000000000000000000000000000000111111111111111111111111111111;
-    //AS->ptr[ofMaskPoint8(1, 1)] = 0b1100000000000000000000000000000000111111111111111111111111111111;
-    //AS->ptr[ofMaskPoint8(2, 1)] = 0b1100000000000000000000000000000000111111111111111111111111111111;
-    //AS->ptr[ofMaskPoint8(0, 1) + 1] = FULLINT;
-    upLevelingMask(AS, 0, 1);
-    //upLevelingMask(AS, 1, 1);
-    //upLevelingMask(AS, 2, 1);
-    printf("<AS|size: %ld>", 63 - ofRightBit(AS->ptr_size << 6));
-    //printf("<point: %ld>", FindMemory(AS, 32));
-    //printf("<memory: %p>", getAlloc(AS, 32));
-    printf("\n01: %lb\n", AS->ptr[ofMaskPoint8(0,1)]);
-    printf("<gap: %ld>", (size_t*)getAlloc(AS, 32) - (size_t*)AS->ptr);
-    ExtendSpace(AS);ExtendSpace(AS);
-    AS->ptr[ofMaskPoint8(1, 1)] = 0b1100000000000000000000000000000000111111111111111111111111111111; // 여기서 공간 없으면 63 에러 -1 에러 나는디
-    printf("\n01: %lb\n", AS->ptr[ofMaskPoint8(0,1)]);
-    printf("<gap: %ld>", (size_t*)getAlloc(AS, 32) - (size_t*)AS->ptr);
-    printf("\n01: %lb\n", AS->ptr[ofMaskPoint8(0,1)]);
-    puts("");
-    printf("<size: %ld>", AS->ptr_size); printf("<rpo: %ld>", ofMaskPoint8(1, 0)); printf("<time: %lf>\n", (double)ofTimeTast(AS) / (1 << 10));
-    puts("");
-    //tastFunction(AS);
-    // end
-    puts("");
+    tastFunction();
+
     AS = destroyAS(AS);
     return 0;
 }
