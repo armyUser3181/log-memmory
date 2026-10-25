@@ -174,7 +174,6 @@ static FN ExtendSpace(ARAS AS)
         return FLOW_ERROR;
     AS->ptr_size = new_size;
     AS->ptr = ptr;
-
     INT level = ofLevel(AS->ptr_size);
     int64_t low = ofStartMaskPoint8(size << 3, level), high = ofStartMaskPoint8(AS->ptr_size << 3, level);
     for (int i = low + 1; i <= high; i++) {
@@ -352,7 +351,7 @@ static FN upLevelingMask(ARAS AS, INT index, INT level)
     return FLOW_NONE;
 }
 
-static void* getAlloc(ARAS AS, INT size) {
+static void* getMemory(ARAS AS, INT size) {
     INT hendle = FindMemory(AS, size);
 
     INT level = ofLevel(size);
@@ -362,9 +361,23 @@ static void* getAlloc(ARAS AS, INT size) {
     INT point = hendle >> (power + 6);
     INT index = hendle - (point << (power + 6));
     hendle == -1 ? 0 : FillMask(AS, point, level + 1, index, size);
-    upLevelingMask(AS, hendle == -1 ? 0 : hendle, level + 1);
+    upLevelingMask(AS, hendle == -1 ? 0 : point, level + 1);
 
     return (void*)(hendle + AS->ptr); // 8 >> 1
+}
+
+static FLOW freeMemory(ARAS AS, void *ptr, INT size) {
+    INT hendle = (uint64_t *)ptr - AS->ptr;
+    INT level = ofLevel(size);
+    INT power = level * 6;
+    INT range = 64 << power;
+    INT element = 1 << power;
+    INT point = hendle >> (power + 6);
+    INT index = hendle - (point << (power + 6));
+    INT mask = ~(~0ULL << size) << index;
+    AS->ptr[ofMaskPoint8(point, level + 1)] &= ~mask;
+    upLevelingMask(AS, point, level + 1);
+    return FLOW_NONE;
 }
 
 static INT tastCase(INT value, INT size, INT R)
@@ -413,7 +426,7 @@ static FN tastFunction(void)
 
     AS->ptr[ofMaskPoint8(0, 1)] = 0b1100000000000000000000000000000000111111111111111111111111111111;
     upLevelingMask(AS, 0, 1);
-    size_t *first = getAlloc(AS, 32);
+    size_t *first = getMemory(AS, 32);
     INT first_offset = (INT)(first - (size_t *)AS->ptr);
     printf("[TEST] first allocation offset=%lu expected=30\n", first_offset);
     if (first_offset != 30)
@@ -445,7 +458,10 @@ static FN tastFunction(void)
     printf("[TEST] point=1 result=%ld expected=no candidate\n", point_one);
     printf("[TEST] point=2 result=%ld expected=128\n", point_two);
 
-    size_t *second = getAlloc(AS, 32);
+    printf("[TEST] mask 2 1 %lb\n", AS->ptr[ofMaskPoint8(2, 1)]);
+    size_t *second = getMemory(AS, 32);
+    printf("[TEST] mask 2 1 %lb\n", AS->ptr[ofMaskPoint8(2, 1)]);
+    
     INT actual_offset = (INT)(second - (size_t *)AS->ptr);
     printf("[TEST] getAlloc offset=%lu expected=128\n", actual_offset);
     if (point_one != (INT)-1 || point_two != 128 || actual_offset != 128)
@@ -460,14 +476,9 @@ static FN tastFunction(void)
 
     printf("[TEST] mask 2 1 %lb\n", AS->ptr[ofMaskPoint8(2, 1)]);
 
-    size_t *third = getAlloc(AS, 32);
+    size_t *third = getMemory(AS, 32);
     INT third_offset = (INT)(third - (size_t *)AS->ptr);
     printf("[TEST] third allocation offset=%lu expected=160\n", third_offset);
-    if (third_offset == -1)
-    {
-        fprintf(stderr, "[TEST FAIL] third allocation did not return the expected offset\n");
-        flow = FLOW_ERROR;
-    }
 
     INT current_find = FindMemory(AS, 32);
     printf("[TEST] FindMemory point=%ld\n", current_find);
@@ -476,17 +487,146 @@ static FN tastFunction(void)
     
     printf("[TEST] mask 1 1 %lb\n", AS->ptr[ofMaskPoint8(1, 1)]);
 
-    size_t *fourth = getAlloc(AS, 16);
+    size_t *fourth = getMemory(AS, 16);
     INT fourth_offset = (INT)(fourth - (size_t *)AS->ptr);
     printf("[TEST] fourth allocation offset=%lu expected=100\n", fourth_offset);
-    if (fourth_offset == -1)
+
+    printf("[TEST] mask 2 1 %lb\n", AS->ptr[ofMaskPoint8(2, 1)]);
+    INT freed_mask = ~(~0ULL << 32);
+    INT second_mask_point = ofMaskPoint8(2, 1);
+    if ((AS->ptr[second_mask_point] & freed_mask) != freed_mask)
     {
-        fprintf(stderr, "[TEST FAIL] fourth allocation did not return the expected offset\n");
+        fprintf(stderr, "[TEST FAIL] second allocation was not marked occupied before free\n");
         flow = FLOW_ERROR;
+        goto cleanup;
     }
 
-    printf("[TEST] mask 1 1 %lb\n", AS->ptr[ofMaskPoint8(1, 1)]);
+    freeMemory(AS, second, 32);
+    printf("[TEST] freed mask=%lb\n", AS->ptr[second_mask_point]);
+    if ((AS->ptr[second_mask_point] & freed_mask) != 0)
+    {
+        fprintf(stderr, "[TEST FAIL] freeMemory did not clear the second allocation mask\n");
+        flow = FLOW_ERROR;
+        goto cleanup;
+    }
+
+    current_find = FindMemory(AS, 32);
+    printf("[TEST] FindMemory after free=%ld expected=128\n", current_find);
+    size_t *reused = getMemory(AS, 32);
+    INT reused_offset = (INT)(reused - (size_t *)AS->ptr);
+    printf("[TEST] reallocation offset=%lu expected=128\n", reused_offset);
+    if (current_find != 128 || reused_offset != 128)
+    {
+        fprintf(stderr, "[TEST FAIL] freed allocation was not returned for reuse\n");
+        flow = FLOW_ERROR;
+        goto cleanup;
+    }
+    puts("[TEST PASS] freeMemory cleared the allocation and the allocator reused its offset");
     
+
+cleanup:
+    destroyAS(AS);
+    return flow;
+}
+
+FLOW TASTFUNCTION1(void) {
+    FLOW flow = FLOW_NONE;
+    ARAS AS = createAS();
+    if(!AS) {
+        flow = FLOW_ERROR;
+        return flow;
+    }
+    for(int i = 0; i < 4; i++) {
+        if(ExtendSpace(AS) == FLOW_ERROR) {
+            flow = FLOW_ERROR;
+            goto cleanup;
+        }
+        printf("[TEST] ExtendSpace %d times\n", i+1);
+        printf("[TEST] AS->ptr_size=%ld\n", AS->ptr_size);
+    }
+    AS->ptr[ofMaskPoint8(0, 1)] = ~0b0;
+    AS->ptr[ofMaskPoint8(1, 1)] = 0b0;
+    size_t **head;
+    size_t count = 6;
+    head = getMemory(AS, sizeof(size_t) * count);
+    if(!head) {
+        flow = FLOW_ERROR;
+        goto cleanup;
+    }
+    printf("[TEST] head offset=%ld\n", (INT)(head - (size_t**)AS->ptr));
+    for(int i = 0; i < count; i++) {
+        head[i] = getMemory(AS, 32);
+    }
+    for(int i = 0; i < count; i++) {
+        printf("[TEST] head[%d] offset=%ld\n", i, (INT)(head[i] - (size_t*)AS->ptr));
+    }
+    /* for(int i = 0; i < count; i++) {
+        freeMemory(AS, head[i], 32);
+    } */
+
+    cleanup:
+    destroyAS(AS);
+    return flow;
+}
+
+FLOW TASTFUNCTION2(void)
+{
+    ARAS AS = createAS();
+    if (!AS)
+    {
+        fprintf(stderr, "[TEST FAIL] TASTFUNCTION2 createAS failed\n");
+        return FLOW_ERROR;
+    }
+
+    FLOW flow = FLOW_NONE;
+    void *blocks[6] = {0};
+    for (int i = 0; i < 4; i++)
+    {
+        if (ExtendSpace(AS) == FLOW_ERROR)
+        {
+            fprintf(stderr, "[TEST FAIL] TASTFUNCTION2 ExtendSpace failed\n");
+            flow = FLOW_ERROR;
+            goto cleanup;
+        }
+    }
+
+    for (int i = 0; i < 6; i++)
+    {
+        blocks[i] = getMemory(AS, 32);
+        if (!blocks[i])
+        {
+            fprintf(stderr, "[TEST FAIL] TASTFUNCTION2 allocation %d returned NULL\n", i);
+            flow = FLOW_ERROR;
+            goto cleanup;
+        }
+        printf("[TEST] external allocation %d=%p\n", i, blocks[i]);
+        for (int previous = 0; previous < i; previous++)
+        {
+            if (blocks[i] == blocks[previous])
+            {
+                fprintf(stderr, "[TEST FAIL] TASTFUNCTION2 returned a duplicate allocation\n");
+                flow = FLOW_ERROR;
+                goto cleanup;
+            }
+        }
+    }
+
+    if (freeMemory(AS, blocks[2], 32) == FLOW_ERROR)
+    {
+        fprintf(stderr, "[TEST FAIL] TASTFUNCTION2 freeMemory failed\n");
+        flow = FLOW_ERROR;
+        goto cleanup;
+    }
+
+    void *reused = getMemory(AS, 32);
+    printf("[TEST] external reuse=%p expected=%p\n", reused, blocks[2]);
+    if (reused != blocks[2])
+    {
+        fprintf(stderr, "[TEST FAIL] TASTFUNCTION2 did not reuse the freed allocation\n");
+        flow = FLOW_ERROR;
+        goto cleanup;
+    }
+    puts("[TEST PASS] external API allocations worked without caller-initialized masks");
 
 cleanup:
     destroyAS(AS);
@@ -500,9 +640,5 @@ int main(int argc, char *argv[])
     INT NULLINT = 0b0000000000000000000000000000000000000000000000000000000000000000;
     INT FULLINT = 0b1111111111111111111111111111111111111111111111111111111111111111;
     INT TASTINT = 0b0000000000000000000000000000000011111111111111111111111111111111;
-    struct AS *AS = createAS();
-    tastFunction();
-
-    AS = destroyAS(AS);
-    return 0;
+    return TASTFUNCTION1() == FLOW_ERROR ? EXIT_FAILURE : EXIT_SUCCESS;
 }
