@@ -20,6 +20,8 @@ static const char *__ERROR_FALSE__ = "FALSE";
 
 #define DEBUG_OVERFLOW(value) debug_overflow(CDA, value)
 #define DEBUG_TOBITRUN(result, value, len) debug_toBitRun(CDA, result, value, len)
+#define DEBUG_EXIST(value) debug_exist(CDA, value)
+#define DEBUG_REALLOC(value) debug_exist(CDA, value)
 
 static inline void calls(CFA, const char *extends) {
     if( extends == __ERROR_FALSE__ ) {
@@ -35,8 +37,7 @@ fn debug_overflow(CFA, uint64_t value) {
     CALLS(exp ? "OVERFLOW" : FALSE );
 }
 
-fn debug_toBitRun(CFA, uint64_t result, uint64_t value, uint64_t size)
-{
+fn debug_toBitRun(CFA, uint64_t result, uint64_t value, uint64_t size) {
     uint64_t debug_value = value;
     uint64_t debug_size = size;
     for (int i = 1; i < size; i++)
@@ -46,6 +47,14 @@ fn debug_toBitRun(CFA, uint64_t result, uint64_t value, uint64_t size)
     char buffer[1024] = {0};
     sprintf(buffer, "BitRun ERROR VALUE: (value: %ld, size: %ld) \n (high: %ld) (low: %ld)", debug_value, debug_size, result, value);
     CALLS( result == value ? FALSE : buffer);
+}
+
+fn debug_exist(CFA, void* value) {
+    CALLS(value == NULL ? "NULL ERROR" : FALSE);
+}
+
+fn debug_realloc(CFA, void* value) {
+    CALLS(value == NULL ? "REALLOC ERROR" : FALSE);
 }
 
 #else

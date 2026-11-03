@@ -3,6 +3,6 @@
 #include <stdint.h>
 #include <string.h>
 
-struct mallocter;
+struct Mallocter;
 
 int tast();
