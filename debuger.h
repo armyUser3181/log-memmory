@@ -22,6 +22,7 @@ static const char *__ERROR_FALSE__ = "FALSE";
 #define DEBUG_TOBITRUN(result, value, len) debug_toBitRun(CDA, result, value, len)
 #define DEBUG_EXIST(value) debug_exist(CDA, value)
 #define DEBUG_REALLOC(value) debug_exist(CDA, value)
+#define DEBUG_OVER(value) debug_over(CDA, value)
 
 static inline void calls(CFA, const char *extends) {
     if( extends == __ERROR_FALSE__ ) {
@@ -55,6 +56,10 @@ fn debug_exist(CFA, void* value) {
 
 fn debug_realloc(CFA, void* value) {
     CALLS(value == NULL ? "REALLOC ERROR" : FALSE);
+}
+
+fn debug_over(CFA, int value) {
+    CALLS(value ? "VALUE OVER" : FALSE);
 }
 
 #else

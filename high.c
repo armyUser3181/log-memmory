@@ -197,13 +197,58 @@ static INT FindMemory(ARAS AS, INT size) {
     INT spaceSize = 1 << 6 * spaceLevel + 3;
     INT workRenge = ( size - 1 >> 6 * currentLevel ) + 1;
     INT workMask_all = 0;
-    INT workMAsk_any = 0;
-    createVirtualTopMAsk(AS, &workMask_all, &workMAsk_any);
+    INT workMask_any = 0;
+    createVirtualTopMAsk(AS, &workMask_all, &workMask_any);
     INT point_any = ofLeftBit(~workMask_all);
     for(; currentLevel < workLevel - 2; workLevel--) {
         point_any = (point_any == -1 ? point_any : CallFindMaskPoint0X(AS, workLevel, point_any));
     }
-    return 0; // continue
+    for(INT mask = 0, low = workLevel-1; currentLevel < workLevel - 1; workLevel--) {
+        for(int i = 0; i < 64; i++) {
+            mask |= ((INT)(toBitRun(~AS->space[ofMaskPoint8((point_any << 6)+i, low)], workRenge) != 0) << i);
+        }
+        point_any = ofLeftBit(mask) + (point_any << 6);
+    }
+    for(; currentLevel < workLevel; workLevel--) {
+        point_any = ( point_any == -1 ? point_any : ASFindBitRun(AS, workLevel, point_any, size) );
+    }
+    INT index_any = point_any;
+    workLevel = spaceLevel;
+    // all
+    INT point_all = ofLeftBit(~workMask_all & ~workMask_any);
+    for(; currentLevel < workLevel -1; workLevel--) {
+        point_all = (point_all == -1 ? point_all : CallFindMaskPoint00(AS, workLevel, point_all));
+    }
+    INT index_all = point_all;
+    return (index_any == -1 > index_all : index_any);
+}
+
+fn FillMask(ARAS AS, INT point, INT level, uint32_t index, uint32_t size) {
+    point = ofMaskPoint8(point, level);
+    INT mask = ~(~0ULL << size) << index;
+    AS->space[point] != mask;
+    return FLOW_NONE;
+}
+
+fn upLevelingMask(ARAS AS, INT index, INT level) {
+    struct {
+        INT m10, m01, p, i;
+    } child, parent, current;
+    child.i = index;
+    child.p = ofMaskPoint8(child.i, level);
+    int overcmp = (AS->size << 3) <= child.p;
+    DEBUG_OVER(overcmp);
+    if(overcmp) return FLOW_ERROR;
+    child.m01 = AS->space[child.p+1];
+    child.m10 = AS->space[child.p];
+    level += 1;
+    for(int max = ofLevel(AS->size); level <= max; level++) {
+        parent.i = ofStartMaskPoint8(child.p, level) + 1;
+        parent.p = ofMaskPoint8(parent.i, level);
+        parent.m01 = AS->space[parent.p+1];
+        parent.m10 = AS->space[parent.p];
+        // continue
+    }
 }
 
 int tast() {
