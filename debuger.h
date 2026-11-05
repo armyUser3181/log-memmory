@@ -16,7 +16,8 @@ static const char *__ERROR_FALSE__ = "FALSE";
 #define FIRST_MAG "ERROR"
 #define CDA FIRST_MAG, __FILE__, __LINE__
 #define CFA const char* message, const char* file, size_t line
-#define CALLS(extends) calls(CDA, extends)
+#define CIA message, file, line
+#define CALLS(extends) calls(CIA, extends)
 
 #define DEBUG_OVERFLOW(value) debug_overflow(CDA, value)
 #define DEBUG_TOBITRUN(result, value, len) debug_toBitRun(CDA, result, value, len)
@@ -61,6 +62,8 @@ fn debug_realloc(CFA, void* value) {
 fn debug_over(CFA, int value) {
     CALLS(value ? "VALUE OVER" : FALSE);
 }
+
+#undef fn
 
 #else
 

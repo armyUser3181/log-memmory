@@ -15,6 +15,7 @@ struct Mallocter {
 typedef uint64_t INT;
 
 static inline INT ofLeftBit(INT value) {
+    if(!value || !~value) return -1;
     DEBUG_OVERFLOW(value);
     INT index = 0;
     for(int i = 1; i < 7; i++) {
@@ -39,6 +40,7 @@ static inline INT ofRightBit(INT value) {
         value <<= RV;
         index += RV;
     }
+    return index;
 }
 
 static INT toBitRun(INT value, INT size) {
@@ -168,7 +170,7 @@ inline static INT ASFindBitRun(ARAS AS, INT level, INT point, INT size) {
     return index + ( index == -1 ? 0 : (point << 6) );
 }
 
-fn createVirtualTopMAsk(ARAS AS, INT *result_all, INT *result_any) {
+fn createVirtualTopMask(ARAS AS, INT *result_all, INT *result_any) {
     INT level = ofLevel(AS->size);
     INT high = ofStartMaskPoint8(AS->size << 3, level);
     struct mask {
@@ -198,7 +200,7 @@ static INT FindMemory(ARAS AS, INT size) {
     INT workRenge = ( size - 1 >> 6 * currentLevel ) + 1;
     INT workMask_all = 0;
     INT workMask_any = 0;
-    createVirtualTopMAsk(AS, &workMask_all, &workMask_any);
+    createVirtualTopMask(AS, &workMask_all, &workMask_any);
     INT point_any = ofLeftBit(~workMask_all);
     for(; currentLevel < workLevel - 2; workLevel--) {
         point_any = (point_any == -1 ? point_any : CallFindMaskPoint0X(AS, workLevel, point_any));
@@ -217,10 +219,12 @@ static INT FindMemory(ARAS AS, INT size) {
     // all
     INT point_all = ofLeftBit(~workMask_all & ~workMask_any);
     for(; currentLevel < workLevel -1; workLevel--) {
-        point_all = (point_all == -1 ? point_all : CallFindMaskPoint00(AS, workLevel, point_all));
+        INT result = CallFindMaskPoint00(AS, workLevel, point_all);
+        INT cmp = ( point_all == -1 || result == (point_all << 6) - 1 );
+        point_all = ( cmp ? -1 : result );
     }
     INT index_all = point_all;
-    return (index_any == -1 > index_all : index_any);
+    return (index_any == -1 ? index_all : index_any);
 }
 
 fn FillMask(ARAS AS, INT point, INT level, uint32_t index, uint32_t size) {
@@ -247,11 +251,60 @@ fn upLevelingMask(ARAS AS, INT index, INT level) {
         parent.p = ofMaskPoint8(parent.i, level);
         parent.m01 = AS->space[parent.p+1];
         parent.m10 = AS->space[parent.p];
-        // continue
+        
+        current.m01 = (0ULL != child.m01 ? 1 : 0);
+        current.m10 = (~0ULL == child.m10 ? 1 : 0);
+        INT indexShift = 1 << child.i;
+        current.m01 = current.m01 << child.i;
+        current.m10 = current.m10 << child.i;
+
+        parent.m01 = ~indexShift;
+        parent.m10 = ~indexShift;
+        parent.m01 |= current.m01;
+        parent.m10 += current.m10;
+
+        AS->space[parent.p + 1] = parent.m01;
+        AS->space[parent.p] = parent.m10;
+        child = parent;
     }
+    return FLOW_NONE;
 }
 
-int tast() {
-    printf("%lb\n", toBitRun(0b1111, 2) );
-    return 0;
+static void* getMemory(ARAS AS, INT size) {
+    INT hendle = FindMemory(AS, size);
+    if(hendle == -1) return NULL;
+    INT level = ofLevel(size);
+    INT power = level * 6;
+    INT range = 64 << power;
+    INT element = 1 << power;
+    INT point = hendle >> (power + 6);
+    INT index = hendle - (point << power + 6);
+    hendle == -1 ? 0 : FillMask(AS, point, level + 1, index, size);
+    upLevelingMask(AS, hendle == -1 ? 0 : point, level + 1);
+    return (void*)(hendle + AS->space);
+}
+
+fn freeMemory(ARAS AS, void* ptr, INT size) {
+    INT hendle = (uint64_t*)ptr - AS->space;
+    INT level = ofLevel(size);
+    INT power = level * 6;
+    INT range = 64 << power;
+    INT element = 1 << power;
+    INT point = hendle >> power + 6;
+    INT index = hendle - (point << power + 6);
+    INT mask = ~( ~0ULL << size ) << index;
+    AS->space[ofMaskPoint8(point, level + 1)] &= ~mask;
+    upLevelingMask(AS, point, level + 1);
+    return FLOW_NONE;
+}
+
+extern struct MallocterManager createMallocterManager() {
+    struct MallocterManager self = { 0 };
+    self.create = createMallocter;
+    self.destroy = destroyMallocter;
+    self.extend = ExtendSpace;
+    self.find = FindMemory;
+    self.take = getMemory;
+    self.free = freeMemory;
+    return self;
 }
