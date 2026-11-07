@@ -298,6 +298,18 @@ fn freeMemory(ARAS AS, void* ptr, INT size) {
     return FLOW_NONE;
 }
 
+fn miniPrintMallocter(ARAS AS, INT point, INT level) {
+    INT low = ofStartMaskPoint8(point, level) + 1;
+    INT high = ofStartMaskPoint8(point, level);
+}
+
+fn printMallocter(ARAS AS) {
+    INT highLevel = ofLevel(AS->size);
+    for(INT level = 0; level != 0; level--) {
+        
+    }
+}
+
 extern struct MallocterManager createMallocterManager() {
     struct MallocterManager self = { 0 };
     self.create = createMallocter;
