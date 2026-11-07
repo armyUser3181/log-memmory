@@ -7,6 +7,8 @@ struct Mallocter {
     uint64_t size;
 };
 
+int tast( struct Mallocter* AS );
+
 #define INT uint64_t
 inline static INT ofMaskPoint64(INT index, INT level) {
     return (1 + index << 6 * level) - (level >> 2) - 1;
@@ -38,13 +40,14 @@ int main() {
         printf("%p \n", a[i]);
     }
     printf("%p", mc->space);
+    tast(mc);
     mmg.destroy(mc);
     printf("hello world\n");
     uint64_t level = 2;
     for(int i = 0; i < 4; i++) {
         uint64_t target = ofMaskPoint8(i, level);
         uint64_t child_level = level - 1;
-        int64_t low = ofStartMaskPoint8( i * 8 << level * 6, child_level) + 1;
+        int64_t low = ofStartMaskPoint8( ofStartMaskPoint8( ofMaskPoint8(i, level), level ) * 8 << level * 6, child_level) + 1;
         int64_t high = ofStartMaskPoint8(target, child_level);
         int64_t count = 0;
         printf("<%ld <", target);
@@ -59,4 +62,5 @@ int main() {
         printf("> : inline>\n");
         printf("%ld %ld\n", low, high);
     }
+    
 }

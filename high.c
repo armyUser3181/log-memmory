@@ -299,15 +299,25 @@ fn freeMemory(ARAS AS, void* ptr, INT size) {
 }
 
 fn miniPrintMallocter(ARAS AS, INT point, INT level) {
-    INT low = ofStartMaskPoint8(point, level) + 1;
-    INT high = ofStartMaskPoint8(point, level);
+    int64_t high = ofStartMaskPoint8(point, level - 1);
+    INT low = ofStartMaskPoint8( ofStartMaskPoint8( point, level ) * 8 << level * 6, level - 1) + 1;
+    if(1 < level) for(int64_t i = low; i < high; i++ ) {
+        miniPrintMallocter( AS, i, level - 1);
+    }
+    printf("<(%ld: %ld)> \n", level, point); // continue
 }
 
 fn printMallocter(ARAS AS) {
     INT highLevel = ofLevel(AS->size);
-    for(INT level = 0; level != 0; level--) {
+    /* for(INT level = 0; level != 0; level--) {
         
-    }
+    } */
+   miniPrintMallocter( AS, ofStartMaskPoint8(0, highLevel), highLevel );
+}
+
+extern int tast(ARAS AS) {
+    printMallocter(AS);
+    return 0;
 }
 
 extern struct MallocterManager createMallocterManager() {
