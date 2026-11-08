@@ -192,7 +192,38 @@ fn createVirtualTopMask(ARAS AS, INT *result_all, INT *result_any) {
     return FLOW_NONE;
 }
 
-static INT FindMemory(ARAS AS, INT size) {
+
+
+static INT miniFindMemoryNew(ARAS AS, INT size, INT level, INT point) {
+    INT currentLevel = ofLevel(size);
+    INT all = AS->space[ofMaskPoint8(point, level)];
+    INT any = AS->space[ofMaskPoint8(point, level) + 1];
+    for(uint64_t index = ofLeftBit(~all); index != -1; all |= 1 << index) {
+        AS->space[ofMaskPoint8(index, level)] = ~all & ~any & 1 << index ? 0 : AS->space[ofMaskPoint8(index, level)];
+        uint64_t value = miniFindMemoryNew(AS, size, level - 1, index + point << 6);
+        if(value != -1) return value;
+    }
+    return -1;
+}
+
+static INT FindMemoryNew(ARAS AS, INT size) { // continue
+    INT currentLevel = ofLevel(size);
+    INT spaceLevel = ofLevel(AS->size);
+    INT workLevel = spaceLevel;
+    INT spaceSize = 1 << 6 * spaceLevel + 3;
+    INT workRenge = ( size - 1 >> 6 * currentLevel ) + 1;
+    INT workMask_all = 0;
+    INT workMask_any = 0;
+    createVirtualTopMask(AS, &workMask_all, &workMask_any);
+    for(uint64_t index = ofLeftBit(~workMask_all); index != -1; workMask_all |= 1 << index) {
+        AS->space[ofMaskPoint8(index, workLevel)] = ~workMask_all & ~workMask_any & 1 << index ? 0 : AS->space[ofMaskPoint8(index, workLevel)];
+        uint64_t value = miniFindMemoryNew(AS, size, workLevel, index << 6);
+        if(value != -1) return value;
+    }
+    return -1;
+}
+
+static INT FindMemoryOld(ARAS AS, INT size) {
     int currentLevel = ofLevel(size);
     INT spaceLevel = ofLevel(AS->size);
     int workLevel = spaceLevel;
@@ -206,9 +237,11 @@ static INT FindMemory(ARAS AS, INT size) {
         point_any = (point_any == -1 ? point_any : CallFindMaskPoint0X(AS, workLevel, point_any));
     }
     for(INT mask = 0, low = workLevel-1; currentLevel < workLevel - 1; workLevel--) {
+        
         for(int i = 0; i < 64; i++) {
             mask |= ((INT)(toBitRun(~AS->space[ofMaskPoint8((point_any << 6)+i, low)], workRenge) != 0) << i);
         }
+        
         point_any = ofLeftBit(mask) + (point_any << 6);
     }
     for(; currentLevel < workLevel; workLevel--) {
@@ -225,6 +258,10 @@ static INT FindMemory(ARAS AS, INT size) {
     }
     INT index_all = point_all;
     return (index_any == -1 ? index_all : index_any);
+}
+
+static INT FindMemory(ARAS AS, INT size) {
+    return FindMemoryOld(AS, size);
 }
 
 fn FillMask(ARAS AS, INT point, INT level, uint32_t index, uint32_t size) {
@@ -300,23 +337,41 @@ fn freeMemory(ARAS AS, void* ptr, INT size) {
 
 fn miniPrintMallocter(ARAS AS, INT point, INT level) {
     int64_t high = ofStartMaskPoint8(point, level - 1);
-    INT low = ofStartMaskPoint8( ofStartMaskPoint8( point, level ) * 8 << level * 6, level - 1) + 1;
+    int64_t low_point = ofStartMaskPoint8( point, level ) << 3 << level * 6;
+    int64_t low = ofStartMaskPoint8( low_point, level - 1) + 1;
+    /**
+     * ofStartMaskPoint8( ofMaskPoint8(i, level), level ) << 3 << level * 6
+     * ofStartMaskPoint8( , child_level) + 1;
+     */
     if(1 < level) for(int64_t i = low; i < high; i++ ) {
         miniPrintMallocter( AS, i, level - 1);
+    } else {
+        low = 0;
+        high = 0;
     }
-    printf("<(%ld: %ld)> \n", level, point); // continue
+    if(2 < level) printf("<(level: %ld, point: %ld, low: %ld, high: %ld)> \n", level, point, low, high); // continue
 }
 
 fn printMallocter(ARAS AS) {
-    INT highLevel = ofLevel(AS->size);
-    /* for(INT level = 0; level != 0; level--) {
-        
-    } */
-   miniPrintMallocter( AS, ofStartMaskPoint8(0, highLevel), highLevel );
+    INT level = ofLevel(AS->size);
+    int64_t low = 0;
+    int64_t high = ofStartMaskPoint8(AS->size * sizeof(INT) << 6, level);
+    for(int64_t i = low; i < high; i++) {
+        miniPrintMallocter( AS, ofMaskPoint8(i, level), level );
+    }
 }
 
 extern int tast(ARAS AS) {
-    printMallocter(AS);
+    //printMallocter(AS);
+    INT value = ~0ULL;
+    printf("%lb\n", value);
+    value &= ~32;
+    value &= ~256;
+    printf("%lb\n", value);
+    value |= 1 << 5;
+    INT index = ofLeftBit(~value);
+    printf("%ld\n", index);
+    printf("%lb\n", value);
     return 0;
 }
 

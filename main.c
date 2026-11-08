@@ -21,14 +21,29 @@ inline static INT ofStartMaskPoint8(INT low, INT level) {
 }
 #undef INT
 
+#define definedEloter(offset, gap, array, value_type, value_name, start_index, end_index) \
+    for( struct { int i, step; char (*iter)[ gap ]; } str = { .i = start_index, .step = 0, .iter = (char*)array - offset }; str.i < end_index; str.i++ ) \
+        for( str.step = 1; str.step; str.step = 0 ) \ // continue
+        for( value_type value_name = *(value_type*)str.iter[str.i]; str.step; str.step = 0 )
+
+int tast_main() {
+    uint64_t arr[32] = {0};
+    for(int i = 0; i < 32; i++) {
+        arr[i] = i;
+    }
+    definedEloter(0, 8, arr, uint64_t, val, 0, 8 ) {
+        printf("<%ld>", val);
+        continue;
+    }
+}
+
 int main() {
 
     struct MallocterManager mmg = createMallocterManager();
     struct Mallocter* mc = mmg.create();
-    puts (mmg.extend(mc));
-    puts (mmg.extend(mc));
-    puts (mmg.extend(mc));
-    puts (mmg.extend(mc));
+    /* for(int i = 0; i < 10; i++ ) {
+        puts (mmg.extend(mc));
+    }
     uint64_t *a[8] = { 0 };
     for(int i = 0; i < 8; i++) {
         a[i] = mmg.take(mc, 16);
@@ -39,15 +54,18 @@ int main() {
     for(int i = 0; i < 8; i++) {
         printf("%p \n", a[i]);
     }
-    printf("%p", mc->space);
+    printf("%p\n", mc->space); */
+    tast_main();
     tast(mc);
+
+
     mmg.destroy(mc);
     printf("hello world\n");
-    uint64_t level = 2;
+    /* uint64_t level = 2;
     for(int i = 0; i < 4; i++) {
         uint64_t target = ofMaskPoint8(i, level);
         uint64_t child_level = level - 1;
-        int64_t low = ofStartMaskPoint8( ofStartMaskPoint8( ofMaskPoint8(i, level), level ) * 8 << level * 6, child_level) + 1;
+        int64_t low = ofStartMaskPoint8( ofStartMaskPoint8( ofMaskPoint8(i, level), level ) << 3 << level * 6, child_level) + 1;
         int64_t high = ofStartMaskPoint8(target, child_level);
         int64_t count = 0;
         printf("<%ld <", target);
@@ -61,6 +79,6 @@ int main() {
         }
         printf("> : inline>\n");
         printf("%ld %ld\n", low, high);
-    }
+    } */
     
 }
