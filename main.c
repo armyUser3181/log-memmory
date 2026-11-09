@@ -22,20 +22,14 @@ inline static INT ofStartMaskPoint8(INT low, INT level) {
 #undef INT
 
 #define definedEloter(offset, gap, array, value_type, value_name, start_index, end_index) \
-    for( struct { int i, step; char (*iter)[ gap ]; } str = { .i = start_index, .step = 0, .iter = (char*)array - offset }; str.i < end_index; str.i++ ) \
-        for( str.step = 1; str.step; str.step = 0 ) \ // continue
-        for( value_type value_name = *(value_type*)str.iter[str.i]; str.step; str.step = 0 )
+    for( struct { int i, step; char (*iter)[ gap ]; } \
+        str = { .i = start_index, .step = 1, .iter = (char*)array - offset }; \
+        str.i < end_index && ++str.step == 2; \
+        str.i++, str.step++ ) \
+        for( value_type* value_name = (value_type*)str.iter[str.i]; \
+        1 < str.step--; str.step = 1 )
 
-int tast_main() {
-    uint64_t arr[32] = {0};
-    for(int i = 0; i < 32; i++) {
-        arr[i] = i;
-    }
-    definedEloter(0, 8, arr, uint64_t, val, 0, 8 ) {
-        printf("<%ld>", val);
-        continue;
-    }
-}
+
 
 int main() {
 
@@ -43,8 +37,11 @@ int main() {
     struct Mallocter* mc = mmg.create();
     /* for(int i = 0; i < 10; i++ ) {
         puts (mmg.extend(mc));
-    }
-    uint64_t *a[8] = { 0 };
+    } */
+    /* for(int i = 0; i < 1; i++ ) {
+        puts (mmg.extend(mc));
+    } */
+    /* uint64_t *a[8] = { 0 };
     for(int i = 0; i < 8; i++) {
         a[i] = mmg.take(mc, 16);
     }
@@ -55,7 +52,6 @@ int main() {
         printf("%p \n", a[i]);
     }
     printf("%p\n", mc->space); */
-    tast_main();
     tast(mc);
 
 

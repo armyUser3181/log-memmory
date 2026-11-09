@@ -15,7 +15,8 @@ struct Mallocter {
 typedef uint64_t INT;
 
 static inline INT ofLeftBit(INT value) {
-    if(!value || !~value) return -1;
+    if(!value) return -1;
+    if(!~value) return 0;
     DEBUG_OVERFLOW(value);
     INT index = 0;
     for(int i = 1; i < 7; i++) {
@@ -196,11 +197,14 @@ fn createVirtualTopMask(ARAS AS, INT *result_all, INT *result_any) {
 
 static INT miniFindMemoryNew(ARAS AS, INT size, INT level, INT point) {
     INT currentLevel = ofLevel(size);
+    if( size < 1 * 8 << currentLevel * 6 + 6 ) return -2;
     INT all = AS->space[ofMaskPoint8(point, level)];
     INT any = AS->space[ofMaskPoint8(point, level) + 1];
+    //printf("<%ld, %ld, %ld, %ld>\n", level, point, all, any);
     for(uint64_t index = ofLeftBit(~all); index != -1; all |= 1 << index) {
-        AS->space[ofMaskPoint8(index, level)] = ~all & ~any & 1 << index ? 0 : AS->space[ofMaskPoint8(index, level)];
+        //AS->space[ofMaskPoint8(index, level)] = ~all & ~any & 1 << index ? 0 : AS->space[ofMaskPoint8(index, level)];
         uint64_t value = miniFindMemoryNew(AS, size, level - 1, index + point << 6);
+        if(value == -2) return index + point << 6;
         if(value != -1) return value;
     }
     return -1;
@@ -215,9 +219,10 @@ static INT FindMemoryNew(ARAS AS, INT size) { // continue
     INT workMask_all = 0;
     INT workMask_any = 0;
     createVirtualTopMask(AS, &workMask_all, &workMask_any);
-    for(uint64_t index = ofLeftBit(~workMask_all); index != -1; workMask_all |= 1 << index) {
-        AS->space[ofMaskPoint8(index, workLevel)] = ~workMask_all & ~workMask_any & 1 << index ? 0 : AS->space[ofMaskPoint8(index, workLevel)];
+    for(uint64_t index; index = ofLeftBit(~workMask_all), index != -1; workMask_all |= 1 << index) {
+        //AS->space[ofMaskPoint8(index, workLevel)] = ~workMask_all & ~workMask_any & 1 << index ? 0 : AS->space[ofMaskPoint8(index, workLevel)];
         uint64_t value = miniFindMemoryNew(AS, size, workLevel, index << 6);
+        if(value == -2) return index;
         if(value != -1) return value;
     }
     return -1;
@@ -261,6 +266,7 @@ static INT FindMemoryOld(ARAS AS, INT size) {
 }
 
 static INT FindMemory(ARAS AS, INT size) {
+    return FindMemoryNew(AS, size);
     return FindMemoryOld(AS, size);
 }
 
@@ -317,6 +323,7 @@ static void* getMemory(ARAS AS, INT size) {
     INT point = hendle >> (power + 6);
     INT index = hendle - (point << power + 6);
     hendle == -1 ? 0 : FillMask(AS, point, level + 1, index, size);
+    printf("<%ld, %ld, %ld, %ld>\n", level, point, index, size);
     upLevelingMask(AS, hendle == -1 ? 0 : point, level + 1);
     return (void*)(hendle + AS->space);
 }
@@ -349,29 +356,33 @@ fn miniPrintMallocter(ARAS AS, INT point, INT level) {
         low = 0;
         high = 0;
     }
-    if(2 < level) printf("<(level: %ld, point: %ld, low: %ld, high: %ld)> \n", level, point, low, high); // continue
+    if(0 < level) {
+        printf("<(level: %ld, point: %ld, low: %ld, high: %ld)> \n", level, point, low, high);
+        printf("<%ld, %ld> \n", AS->space[point], AS->space[point + 1]);
+    }
+    return FLOW_NONE;
 }
 
 fn printMallocter(ARAS AS) {
     INT level = ofLevel(AS->size);
     int64_t low = 0;
-    int64_t high = ofStartMaskPoint8(AS->size * sizeof(INT) << 6, level);
+    int64_t high = ofStartMaskPoint8(AS->size * sizeof(INT) << 3, level);
     for(int64_t i = low; i < high; i++) {
         miniPrintMallocter( AS, ofMaskPoint8(i, level), level );
     }
 }
 
 extern int tast(ARAS AS) {
-    //printMallocter(AS);
-    INT value = ~0ULL;
-    printf("%lb\n", value);
-    value &= ~32;
-    value &= ~256;
-    printf("%lb\n", value);
-    value |= 1 << 5;
-    INT index = ofLeftBit(~value);
-    printf("%ld\n", index);
-    printf("%lb\n", value);
+    /* for(int i = 0; i < 2; i++) {
+        INT result = getMemory(AS, 16);
+        INT offset = (uint64_t*)AS->space;
+        INT hendle = result - offset;
+        printf("<%ld>\n", hendle);
+    } */
+    //FillMask(AS, 0, 1, 0, 16);
+    AS->space[ofMaskPoint8(0, 1)] = 0b0100000000000000000000000000000000000111111111111111111111111111;
+    upLevelingMask(AS, 0, 1);
+    printMallocter(AS);
     return 0;
 }
 
