@@ -210,12 +210,13 @@ static INT miniFindMemory(ARAS AS, INT size, INT level, INT point) {
     INT any = AS->space[ofMaskPoint8(point, level) + 1];
     if( currentLevel + 1 == level ) {
         uint64_t value = ASFindBitRun(AS, level, point, size);
-        //printf("hello world %ld, %ld, %ld, %ld\n", level, point, size, value);
+        printf("hello world %ld, %ld, %ld, %ld\n", level, point, size, value);
         return value;
     } else {
         //printf("<%ld, %ld, %ld, %ld>\n", level, point, all, any);
-        for(uint64_t index = ofLeftBit(~all); index != -1; all |= 1 << index) {
+        for(uint64_t index; index = ofLeftBit(~all), index != -1; all |= 1 << index) {
             //AS->space[ofMaskPoint8(index, level)] = ~all & ~any & 1 << index ? 0 : AS->space[ofMaskPoint8(index, level)];
+            printf("miniFindMemory %ld, %ld, %ld, %ld, %ld\n", level, point, index, size, all);
             uint64_t value = miniFindMemory(AS, size, level - 1, index + point << 6);
             if(value != -1) return value;
         }
@@ -256,7 +257,10 @@ fn upLevelingMask(ARAS AS, INT index, INT level) {
     } child, parent, current;
     child.i = index;
     child.p = ofMaskPoint8(child.i, level);
-    int overcmp = (AS->size << 3) <= child.p;
+    int overcmp = ofRangeSize8(AS->size) <= child.p;
+    if(overcmp) {
+        printf("upLevelingMask overcmp range %ld, size %ld, p %ld, level %ld, i %ld\n", ofRangeSize8(AS->size), AS->size, child.p, level, index);
+    }
     DEBUG_OVER(overcmp);
     if(overcmp) return FLOW_ERROR;
     child.m01 = AS->space[child.p+1];
@@ -325,7 +329,7 @@ fn miniPrintMallocter(ARAS AS, INT point, INT level) {
      * ofStartMaskPoint8( , child_level) + 1;
      */
     if(1 < level) for(int64_t i = low; i < high; i++ ) {
-        miniPrintMallocter( AS, i, level - 1);
+        miniPrintMallocter( AS, ofMaskPoint8(i, level - 1), level - 1);
     } else {
         low = 0;
         high = 0;
@@ -349,9 +353,9 @@ fn printMallocter(ARAS AS) {
 
 extern int tast(ARAS AS) {
     AS->space[ofMaskPoint8(0, 1)] = ~0b0000000000000000000000000000000000000000000000000000000000111111;
-    upLevelingMask(AS, 0, 1);
-    printMallocter(AS);
-    for(int i = 0; i < 4; i++) {
+    //upLevelingMask(AS, 0, 1);
+    //printMallocter(AS);
+    for(int i = 0; i < 1; i++) {
         INT result = (INT)getMemory(AS, 33);
         INT offset = (INT)AS->space;
         INT hendle = result ? result - offset : -1;

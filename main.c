@@ -38,7 +38,7 @@ int main() {
     /* for(int i = 0; i < 10; i++ ) {
         puts (mmg.extend(mc));
     } */
-    for(int i = 0; i < 1; i++ ) {
+    for(int i = 0; i < 4; i++ ) {
         puts (mmg.extend(mc));
     }
     /* uint64_t *a[8] = { 0 };
