@@ -204,7 +204,7 @@ fn createVirtualTopMask(ARAS AS, INT *result_all, INT *result_any) {
 
 
 
-static INT miniFindMemoryNew(ARAS AS, INT size, INT level, INT point) {
+static INT miniFindMemory(ARAS AS, INT size, INT level, INT point) {
     INT currentLevel = ofLevel(size);
     INT all = AS->space[ofMaskPoint8(point, level)];
     INT any = AS->space[ofMaskPoint8(point, level) + 1];
@@ -216,14 +216,14 @@ static INT miniFindMemoryNew(ARAS AS, INT size, INT level, INT point) {
         //printf("<%ld, %ld, %ld, %ld>\n", level, point, all, any);
         for(uint64_t index = ofLeftBit(~all); index != -1; all |= 1 << index) {
             //AS->space[ofMaskPoint8(index, level)] = ~all & ~any & 1 << index ? 0 : AS->space[ofMaskPoint8(index, level)];
-            uint64_t value = miniFindMemoryNew(AS, size, level - 1, index + point << 6);
+            uint64_t value = miniFindMemory(AS, size, level - 1, index + point << 6);
             if(value != -1) return value;
         }
     }
     return -1;
 }
 
-static INT FindMemoryNew(ARAS AS, INT size) {
+static INT FindMemory(ARAS AS, INT size) {
     INT currentLevel = ofLevel(size);
     INT spaceLevel = ofLevel(AS->size);
     INT workLevel = spaceLevel;
@@ -236,53 +236,11 @@ static INT FindMemoryNew(ARAS AS, INT size) {
     uint64_t index = ofLeftBit(~workMask_all);
     for( ; index = ofLeftBit(~workMask_all), index != -1; workMask_all |= 1 << index ) {
         //AS->space[ofMaskPoint8(index, workLevel)] = ~workMask_all & ~workMask_any & 1 << index ? 0 : AS->space[ofMaskPoint8(index, workLevel)];
-        uint64_t value = miniFindMemoryNew(AS, size, workLevel, index);
+        uint64_t value = miniFindMemory(AS, size, workLevel, index);
         //printf("all %ld, any %ld, level %ld, index %ld, size %ld, value %ld\n", workMask_all, workMask_any, workLevel, index, size, value);
         if(value != -1) return value;
     }
     return -1;
-}
-
-static INT FindMemoryOld(ARAS AS, INT size) {
-    int currentLevel = ofLevel(size);
-    INT spaceLevel = ofLevel(AS->size);
-    int workLevel = spaceLevel;
-    INT spaceSize = 1 << 6 * spaceLevel + 3;
-    INT workRenge = ( size - 1 >> 6 * currentLevel ) + 1;
-    INT workMask_all = 0;
-    INT workMask_any = 0;
-    createVirtualTopMask(AS, &workMask_all, &workMask_any);
-    INT point_any = ofLeftBit(~workMask_all);
-    for(; currentLevel < workLevel - 2; workLevel--) {
-        point_any = (point_any == -1 ? point_any : CallFindMaskPoint0X(AS, workLevel, point_any));
-    }
-    for(INT mask = 0, low = workLevel-1; currentLevel < workLevel - 1; workLevel--) {
-        
-        for(int i = 0; i < 64; i++) {
-            mask |= ((INT)(toBitRun(~AS->space[ofMaskPoint8((point_any << 6)+i, low)], workRenge) != 0) << i);
-        }
-        
-        point_any = ofLeftBit(mask) + (point_any << 6);
-    }
-    for(; currentLevel < workLevel; workLevel--) {
-        point_any = ( point_any == -1 ? point_any : ASFindBitRun(AS, workLevel, point_any, size) );
-    }
-    INT index_any = point_any;
-    workLevel = spaceLevel;
-    // all
-    INT point_all = ofLeftBit(~workMask_all & ~workMask_any);
-    for(; currentLevel < workLevel -1; workLevel--) {
-        INT result = CallFindMaskPoint00(AS, workLevel, point_all);
-        INT cmp = ( point_all == -1 || result == (point_all << 6) - 1 );
-        point_all = ( cmp ? -1 : result );
-    }
-    INT index_all = point_all;
-    return (index_any == -1 ? index_all : index_any);
-}
-
-static INT FindMemory(ARAS AS, INT size) {
-    return FindMemoryNew(AS, size);
-    return FindMemoryOld(AS, size);
 }
 
 fn FillMask(ARAS AS, INT point, INT level, uint32_t index, uint32_t size) {
