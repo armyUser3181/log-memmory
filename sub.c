@@ -161,7 +161,7 @@ inline static INT CallFindMaskPoint0X(ARAS AS, INT level, INT point) {
 }
 
 inline static INT ASFindBitRun(ARAS AS, INT level, INT point, INT size) {
-    DEBUG_OVERFLOW(point);
+    if(0 != point) DEBUG_OVERFLOW(point);
     INT maskPoint = ofMaskPoint8(point, level);
     INT all = AS->space[maskPoint];
     INT any = AS->space[maskPoint+1];
@@ -174,6 +174,7 @@ inline static INT ASFindBitRun(ARAS AS, INT level, INT point, INT size) {
 fn createVirtualTopMask(ARAS AS, INT *result_all, INT *result_any) {
     INT level = ofLevel(AS->size);
     INT high = ofStartMaskPoint8(AS->size << 3, level);
+    printf("<level %ld, high %ld>\n", level, high);
     struct mask {
         INT all; INT any;
     };
@@ -197,15 +198,19 @@ fn createVirtualTopMask(ARAS AS, INT *result_all, INT *result_any) {
 
 static INT miniFindMemoryNew(ARAS AS, INT size, INT level, INT point) {
     INT currentLevel = ofLevel(size);
-    if( size < 1 * 8 << currentLevel * 6 + 6 ) return -2;
     INT all = AS->space[ofMaskPoint8(point, level)];
     INT any = AS->space[ofMaskPoint8(point, level) + 1];
-    //printf("<%ld, %ld, %ld, %ld>\n", level, point, all, any);
-    for(uint64_t index = ofLeftBit(~all); index != -1; all |= 1 << index) {
-        //AS->space[ofMaskPoint8(index, level)] = ~all & ~any & 1 << index ? 0 : AS->space[ofMaskPoint8(index, level)];
-        uint64_t value = miniFindMemoryNew(AS, size, level - 1, index + point << 6);
-        if(value == -2) return index + point << 6;
-        if(value != -1) return value;
+    if( currentLevel + 1 == level ) {
+        uint64_t value = ASFindBitRun(AS, level, point, size);
+        //printf("hello world %ld, %ld, %ld, %ld\n", level, point, size, value);
+        return value;
+    } else {
+        //printf("<%ld, %ld, %ld, %ld>\n", level, point, all, any);
+        for(uint64_t index = ofLeftBit(~all); index != -1; all |= 1 << index) {
+            //AS->space[ofMaskPoint8(index, level)] = ~all & ~any & 1 << index ? 0 : AS->space[ofMaskPoint8(index, level)];
+            uint64_t value = miniFindMemoryNew(AS, size, level - 1, index + point << 6);
+            if(value != -1) return value;
+        }
     }
     return -1;
 }
@@ -221,8 +226,8 @@ static INT FindMemoryNew(ARAS AS, INT size) { // continue
     createVirtualTopMask(AS, &workMask_all, &workMask_any);
     for(uint64_t index; index = ofLeftBit(~workMask_all), index != -1; workMask_all |= 1 << index) {
         //AS->space[ofMaskPoint8(index, workLevel)] = ~workMask_all & ~workMask_any & 1 << index ? 0 : AS->space[ofMaskPoint8(index, workLevel)];
+        printf("<dd %ld, %ld, %ld, %ld>\n", workLevel, index, ~workMask_all, ~workMask_any);
         uint64_t value = miniFindMemoryNew(AS, size, workLevel, index << 6);
-        if(value == -2) return index;
         if(value != -1) return value;
     }
     return -1;
@@ -273,7 +278,7 @@ static INT FindMemory(ARAS AS, INT size) {
 fn FillMask(ARAS AS, INT point, INT level, uint32_t index, uint32_t size) {
     point = ofMaskPoint8(point, level);
     INT mask = ~(~0ULL << size) << index;
-    AS->space[point] != mask;
+    AS->space[point] |= mask;
     return FLOW_NONE;
 }
 
@@ -323,7 +328,7 @@ static void* getMemory(ARAS AS, INT size) {
     INT point = hendle >> (power + 6);
     INT index = hendle - (point << power + 6);
     hendle == -1 ? 0 : FillMask(AS, point, level + 1, index, size);
-    printf("<%ld, %ld, %ld, %ld>\n", level, point, index, size);
+    //printf("<%ld, %ld, %ld, %ld>\n", level, point, index, size);
     upLevelingMask(AS, hendle == -1 ? 0 : point, level + 1);
     return (void*)(hendle + AS->space);
 }
@@ -358,7 +363,7 @@ fn miniPrintMallocter(ARAS AS, INT point, INT level) {
     }
     if(0 < level) {
         printf("<(level: %ld, point: %ld, low: %ld, high: %ld)> \n", level, point, low, high);
-        printf("<%ld, %ld> \n", AS->space[point], AS->space[point + 1]);
+        printf("<%lb, %lb> \n", AS->space[point], AS->space[point + 1]);
     }
     return FLOW_NONE;
 }
@@ -373,15 +378,16 @@ fn printMallocter(ARAS AS) {
 }
 
 extern int tast(ARAS AS) {
-    /* for(int i = 0; i < 2; i++) {
+    AS->space[ofMaskPoint8(0, 1)] = ~0b0000000000000000000000000000000000000000000000000000000000111111;
+    upLevelingMask(AS, 0, 1);
+    printMallocter(AS);
+    for(int i = 0; i < 2; i++) {
         INT result = getMemory(AS, 16);
         INT offset = (uint64_t*)AS->space;
-        INT hendle = result - offset;
-        printf("<%ld>\n", hendle);
-    } */
+        INT hendle = result ? result - offset : -1;
+        printf("<result %lb>\n", hendle);
+    }
     //FillMask(AS, 0, 1, 0, 16);
-    AS->space[ofMaskPoint8(0, 1)] = 0b0100000000000000000000000000000000000111111111111111111111111111;
-    upLevelingMask(AS, 0, 1);
     printMallocter(AS);
     return 0;
 }
