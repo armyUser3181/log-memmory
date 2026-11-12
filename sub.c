@@ -204,7 +204,15 @@ fn createVirtualTopMask(ARAS AS, INT *result_all, INT *result_any) {
     return FLOW_NONE;
 }
 
-
+static INT miniEndFindMemory(ARAS AS, INT size, INT level, INT point) {
+    INT all = AS->space[ofMaskPoint8(point, level)];
+    INT any = AS->space[ofMaskPoint8(point, level) + 1];
+    INT code = 0;
+    for(int i = 0; i < 64; i++) {
+        code |= ( ASFindBitRun(AS, level, point + i, size) ) << i;
+    }
+    return ofLeftBit(code);
+}
 
 static INT miniFindMemory(ARAS AS, INT size, INT level, INT point) {
     INT currentLevel = ofLevel(size);
