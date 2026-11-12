@@ -213,7 +213,7 @@ static INT miniFindMemory(ARAS AS, INT size, INT level, INT point) {
     //printf(" index %ld, all %lb, any %lb, level %ld, point %ld, size %ld\n", ofLeftBit(~all), all, any, level, point, size);
     if( currentLevel + 1 == level ) {
         uint64_t value = ASFindBitRun(AS, level, point, size);
-        //printf("hello world %ld, %ld, %ld, %ld\n", level, point, size, value);
+        printf("hello world %ld, %ld, %ld, %ld\n", level, point, size, value);
         return value;
     } else {
         //printf("<%ld, %ld, %ld, %ld>\n", level, point, all, any);
