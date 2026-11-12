@@ -211,7 +211,7 @@ static INT miniEndFindMemory(ARAS AS, INT size, INT level, INT point) {
     for(int i = 0; i < 64; i++) {
         code |= ( ASFindBitRun(AS, level, point + i, size) ) << i;
     }
-    return ofLeftBit(code);
+    return ofLeftBit(code) + (point << 6);
 }
 
 static INT miniFindMemory(ARAS AS, INT size, INT level, INT point) {
@@ -220,7 +220,8 @@ static INT miniFindMemory(ARAS AS, INT size, INT level, INT point) {
     INT any = AS->space[ofMaskPoint8(point, level) + 1];
     //printf(" index %ld, all %lb, any %lb, level %ld, point %ld, size %ld\n", ofLeftBit(~all), all, any, level, point, size);
     if( currentLevel + 1 == level ) {
-        uint64_t value = ASFindBitRun(AS, level, point, size);
+        //uint64_t value = ASFindBitRun(AS, level, point, size);
+        uint64_t value = miniEndFindMemory(AS, size, level, point);
         printf("hello world %ld, %ld, %ld, %ld\n", level, point, size, value);
         return value;
     } else {
